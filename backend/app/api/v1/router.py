@@ -6,6 +6,7 @@ from fastapi import APIRouter
 from app.api.v1 import (
     attendance,
     auth,
+    dynamic,
     entities,
     exams,
     fees,
@@ -15,6 +16,7 @@ from app.api.v1 import (
     promotion,
     reports,
     users,
+    workflows,
 )
 
 api_router = APIRouter()
@@ -23,9 +25,11 @@ api_router.include_router(meta.router)
 api_router.include_router(masters.router)
 api_router.include_router(users.router)
 api_router.include_router(entities.router)        # typed CRUD (students, fees, exams, ...)
+api_router.include_router(dynamic.router)         # typed CRUD from the domain registry
 api_router.include_router(generic.router)         # metadata-driven records for all modules
 api_router.include_router(fees.router)            # payments / ledger
 api_router.include_router(attendance.router)
 api_router.include_router(exams.router)           # marks / report card
 api_router.include_router(promotion.router)
+api_router.include_router(workflows.router)       # lifecycle: admissions, library, hostel, hr
 api_router.include_router(reports.router)

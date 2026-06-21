@@ -2,6 +2,7 @@ import { useQueries } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../lib/api";
 import type { FieldDef } from "../lib/types";
+import { ReferenceSelect } from "./ReferenceSelect";
 
 interface Props {
   fields: FieldDef[];
@@ -51,7 +52,15 @@ export function EntityForm({ fields, initial, onSubmit, onCancel, submitting, er
               {f.label}
               {f.is_required && <span className="text-red-500"> *</span>}
             </label>
-            {renderField(f, values[f.name], (val) => set(f.name, val), optionsByMaster)}
+            {f.data_type === "reference" && f.reference_entity ? (
+              <ReferenceSelect
+                entitySlug={f.reference_entity}
+                value={values[f.name]}
+                onChange={(val) => set(f.name, val)}
+              />
+            ) : (
+              renderField(f, values[f.name], (val) => set(f.name, val), optionsByMaster)
+            )}
             {f.help_text && <p className="mt-1 text-[11px] text-slate-400">{f.help_text}</p>}
           </div>
         ))}

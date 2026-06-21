@@ -6,9 +6,12 @@ Produces list/get/create/update/delete endpoints for a typed SQLAlchemy model wi
   * RBAC guards derived from a module slug (``<slug>:read|create|update|delete``)
   * immutable audit-log entries on every mutation
   * keyword search across string columns and simple equality filters
-"""
-from __future__ import annotations
 
+NOTE: this module must NOT use ``from __future__ import annotations`` — the request
+body parameter is annotated with a closure variable (the create/update schema), and
+PEP 563 stringised annotations would hide that class from FastAPI, causing it to treat
+the body as query params. Keeping real (evaluated) annotations is required here.
+"""
 import uuid
 from typing import Any, Type
 

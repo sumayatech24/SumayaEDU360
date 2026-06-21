@@ -3,10 +3,14 @@ import { Layout } from "./components/Layout";
 import { ResourcePage } from "./components/ResourcePage";
 import { useAuth } from "./lib/auth";
 import { Academic } from "./pages/Academic";
+import { Admissions } from "./pages/Admissions";
 import { Attendance } from "./pages/Attendance";
 import { Audit } from "./pages/Audit";
 import { Dashboard } from "./pages/Dashboard";
 import { Fees } from "./pages/Fees";
+import { Hostel } from "./pages/Hostel";
+import { HR } from "./pages/HR";
+import { Library } from "./pages/Library";
 import { Login } from "./pages/Login";
 import { Masters } from "./pages/Masters";
 import { ModulePage } from "./pages/ModulePage";
@@ -33,8 +37,12 @@ export default function App() {
       >
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/academic" element={<Academic />} />
+        <Route path="/admissions" element={<Admissions />} />
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/fees" element={<Fees />} />
+        <Route path="/library" element={<Library />} />
+        <Route path="/hostel" element={<Hostel />} />
+        <Route path="/hr" element={<HR />} />
         <Route path="/promotion" element={<Promotion />} />
         <Route path="/masters" element={<Masters />} />
         <Route path="/users" element={<Users />} />
@@ -46,10 +54,6 @@ export default function App() {
         <Route
           path="/employees"
           element={<ResourcePage entitySlug="employee" permPrefix="employee_hrms" title="Employees / HR" />}
-        />
-        <Route
-          path="/admissions"
-          element={<ResourcePage entitySlug="admission-lead" permPrefix="admissions_crm" title="Admissions" />}
         />
         <Route path="/m/:slug" element={<ModulePage />} />
         <Route index element={<Navigate to="/dashboard" replace />} />

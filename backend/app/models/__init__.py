@@ -38,6 +38,9 @@ from app.models.meta import (  # noqa: F401
     Notification,
     Setting,
 )
+from app.models.hostel import HostelAllocation, HostelBlock, HostelRoom  # noqa: F401
+from app.models.hr import LeaveRequest, LeaveType, Payroll  # noqa: F401
+from app.models.library import BookIssue, LibraryBook  # noqa: F401
 from app.models.people import (  # noqa: F401
     Employee,
     Guardian,
@@ -45,6 +48,12 @@ from app.models.people import (  # noqa: F401
     Teacher,
 )
 from app.models.tenant import Campus, Institution, Tenant  # noqa: F401
+from app.models.transport import (  # noqa: F401
+    RouteStop,
+    StudentTransportAssignment,
+    TransportRoute,
+    Vehicle,
+)
 
 __all__ = [
     "AcademicYear", "Grade", "Program", "Section", "Semester", "Subject", "Topic",
@@ -56,4 +65,8 @@ __all__ = [
     "MasterValue", "MenuItem", "Module", "ModuleCapability", "Notification", "Setting",
     "Employee", "Guardian", "Student", "Teacher",
     "Campus", "Institution", "Tenant",
+    "LibraryBook", "BookIssue",
+    "TransportRoute", "Vehicle", "RouteStop", "StudentTransportAssignment",
+    "HostelBlock", "HostelRoom", "HostelAllocation",
+    "LeaveType", "LeaveRequest", "Payroll",
 ]

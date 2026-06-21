@@ -25,8 +25,13 @@ export interface ResourceEndpoint {
 }
 
 export function endpointFor(entity: EntityDef): ResourceEndpoint {
-  if (entity.is_typed && entity.typed_table && TYPED_PATHS[entity.typed_table]) {
-    return { base: TYPED_PATHS[entity.typed_table], generic: false };
+  if (entity.is_typed) {
+    // Core entities keep their pluralised REST path; registry-driven typed
+    // entities expose a collection at `/{slug}` (matching the dynamic router).
+    if (entity.typed_table && TYPED_PATHS[entity.typed_table]) {
+      return { base: TYPED_PATHS[entity.typed_table], generic: false };
+    }
+    return { base: `/${entity.slug}`, generic: false };
   }
   return { base: `/records/${entity.slug}`, generic: true };
 }

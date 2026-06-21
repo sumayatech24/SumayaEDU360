@@ -4,6 +4,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import CurrentUser
@@ -31,7 +32,8 @@ async def record_audit(
         entity_id=str(entity_id) if entity_id is not None else None,
         method=method,
         path=path,
-        changes=changes,
+        # Coerce Decimal/UUID/date/etc. into JSON-safe primitives.
+        changes=jsonable_encoder(changes) if changes is not None else None,
         ip_address=ip_address,
     )
     db.add(log)

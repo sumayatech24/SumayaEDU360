@@ -1,0 +1,59 @@
+"""Import every model so SQLAlchemy's metadata is fully populated."""
+from app.models.academic import (  # noqa: F401
+    AcademicYear,
+    Grade,
+    Program,
+    Section,
+    Semester,
+    Subject,
+    Topic,
+)
+from app.models.admissions import AdmissionLead  # noqa: F401
+from app.models.attendance import Attendance  # noqa: F401
+from app.models.auth import (  # noqa: F401
+    Permission,
+    Role,
+    RolePermission,
+    User,
+    UserRole,
+)
+from app.models.exams import Exam, Marks, QuestionPaper  # noqa: F401
+from app.models.fees import (  # noqa: F401
+    FeePlan,
+    FeePlanComponent,
+    Invoice,
+    Payment,
+)
+from app.models.meta import (  # noqa: F401
+    AuditLog,
+    Document,
+    EntityDef,
+    EntityRecord,
+    FieldDef,
+    MasterType,
+    MasterValue,
+    MenuItem,
+    Module,
+    ModuleCapability,
+    Notification,
+    Setting,
+)
+from app.models.people import (  # noqa: F401
+    Employee,
+    Guardian,
+    Student,
+    Teacher,
+)
+from app.models.tenant import Campus, Institution, Tenant  # noqa: F401
+
+__all__ = [
+    "AcademicYear", "Grade", "Program", "Section", "Semester", "Subject", "Topic",
+    "AdmissionLead", "Attendance",
+    "Permission", "Role", "RolePermission", "User", "UserRole",
+    "Exam", "Marks", "QuestionPaper",
+    "FeePlan", "FeePlanComponent", "Invoice", "Payment",
+    "AuditLog", "Document", "EntityDef", "EntityRecord", "FieldDef", "MasterType",
+    "MasterValue", "MenuItem", "Module", "ModuleCapability", "Notification", "Setting",
+    "Employee", "Guardian", "Student", "Teacher",
+    "Campus", "Institution", "Tenant",
+]

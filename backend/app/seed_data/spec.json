@@ -1,0 +1,3066 @@
+{
+  "modules": [
+    {
+      "id": "M001",
+      "name": "Public Website & CMS",
+      "slug": "public_website_cms",
+      "description": "Static/dynamic institution website, admissions landing pages, event pages, gallery, SEO, virtual tour, banners",
+      "priority": "High",
+      "bucket": "MVP"
+    },
+    {
+      "id": "M002",
+      "name": "Admissions CRM",
+      "slug": "admissions_crm",
+      "description": "Inquiry, counseling, entrance test, document collection, admission approval, enrollment",
+      "priority": "High",
+      "bucket": "MVP"
+    },
+    {
+      "id": "M003",
+      "name": "Student Information System",
+      "slug": "student_information_system",
+      "description": "Student profile, lifecycle, documents, health, guardians, promotion, TC, alumni",
+      "priority": "High",
+      "bucket": "MVP"
+    },
+    {
+      "id": "M004",
+      "name": "Parent & Guardian Portal",
+      "slug": "parent_guardian_portal",
+      "description": "Child visibility, fee payments, communication, PTM, consent, approvals",
+      "priority": "High",
+      "bucket": "Enterprise"
+    },
+    {
+      "id": "M005",
+      "name": "Teacher Management",
+      "slug": "teacher_management",
+      "description": "Teacher profile, timetable, classes, homework, marks, lesson plans",
+      "priority": "High",
+      "bucket": "Enterprise"
+    },
+    {
+      "id": "M006",
+      "name": "Employee HRMS",
+      "slug": "employee_hrms",
+      "description": "Recruitment, onboarding, attendance, leave, payroll, documents, exit",
+      "priority": "High",
+      "bucket": "Enterprise"
+    },
+    {
+      "id": "M007",
+      "name": "Academic Configuration",
+      "slug": "academic_configuration",
+      "description": "Boards, grades, semesters, terms, streams, sections, batches, subjects, topics",
+      "priority": "High",
+      "bucket": "MVP"
+    },
+    {
+      "id": "M008",
+      "name": "Curriculum & Lesson Planning",
+      "slug": "curriculum_lesson_planning",
+      "description": "Syllabus, lesson plan, outcomes, resources, completion tracking",
+      "priority": "High",
+      "bucket": "Enterprise"
+    },
+    {
+      "id": "M009",
+      "name": "Timetable & Scheduling",
+      "slug": "timetable_scheduling",
+      "description": "Class, teacher, room, lab, substitution, availability and conflict management",
+      "priority": "High",
+      "bucket": "Enterprise"
+    },
+    {
+      "id": "M010",
+      "name": "Attendance",
+      "slug": "attendance",
+      "description": "Student/staff attendance via manual, QR, RFID, biometric, face recognition and geofence",
+      "priority": "High",
+      "bucket": "MVP"
+    },
+    {
+      "id": "M011",
+      "name": "Homework & Assignments",
+      "slug": "homework_assignments",
+      "description": "Homework, projects, submissions, grading, rubrics, parent visibility",
+      "priority": "High",
+      "bucket": "Enterprise"
+    },
+    {
+      "id": "M012",
+      "name": "Examination Management",
+      "slug": "examination_management",
+      "description": "Exam plans, internal exams, semester exams, question bank, marks entry, grading",
+      "priority": "High",
+      "bucket": "MVP"
+    },
+    {
+      "id": "M013",
+      "name": "Question Paper Management",
+      "slug": "question_paper_management",
+      "description": "Subject-wise papers, blueprint, moderation, approval, printing, online exams",
+      "priority": "High",
+      "bucket": "Enterprise"
+    },
+    {
+      "id": "M014",
+      "name": "Report Cards & Transcripts",
+      "slug": "report_cards_transcripts",
+      "description": "CBSE/IB/semester formats, GPA, remarks, promotion rules, transcripts",
+      "priority": "High",
+      "bucket": "Enterprise"
+    },
+    {
+      "id": "M015",
+      "name": "Library Management",
+      "slug": "library_management",
+      "description": "Physical library, digital library, issue/return, reservations, fines, resource access",
+      "priority": "High",
+      "bucket": "Enterprise"
+    },
+    {
+      "id": "M016",
+      "name": "Digital Learning Repository",
+      "slug": "digital_learning_repository",
+      "description": "E-books, videos, notes, papers, recorded classes, chapter-wise content",
+      "priority": "High",
+      "bucket": "Enterprise"
+    },
+    {
+      "id": "M017",
+      "name": "Fees & Billing",
+      "slug": "fees_billing",
+      "description": "Fee plans, activity charges, collection, reminders, concessions, refunds, receipts",
+      "priority": "High",
+      "bucket": "MVP"
+    },
+    {
+      "id": "M018",
+      "name": "Finance & Accounting",
+      "slug": "finance_accounting",
+      "description": "Ledger, vendors, purchase orders, budgets, expense approvals, reconciliation",
+      "priority": "High",
+      "bucket": "Enterprise"
+    },
+    {
+      "id": "M019",
+      "name": "Meal & Cafeteria",
+      "slug": "meal_cafeteria",
+      "description": "Meal plans, distribution, menu, nutrition, inventory, vendor procurement",
+      "priority": "High",
+      "bucket": "Enterprise"
+    },
+    {
+      "id": "M020",
+      "name": "Transport",
+      "slug": "transport",
+      "description": "Routes, vehicles, stops, GPS, drivers, fee mapping, student tracking",
+      "priority": "Medium",
+      "bucket": "Enterprise"
+    },
+    {
+      "id": "M021",
+      "name": "Hostel",
+      "slug": "hostel",
+      "description": "Rooms, allocation, visitors, attendance, mess, hostel fees, discipline",
+      "priority": "Medium",
+      "bucket": "Enterprise"
+    },
+    {
+      "id": "M022",
+      "name": "Activities & Events",
+      "slug": "activities_events",
+      "description": "Clubs, sports, competitions, summer camps, off-campus activities, registration, charges",
+      "priority": "Medium",
+      "bucket": "Enterprise"
+    },
+    {
+      "id": "M023",
+      "name": "PTM & Communication",
+      "slug": "ptm_communication",
+      "description": "PTM slots, meeting notes, feedback, email, SMS, WhatsApp, push notifications",
+      "priority": "Medium",
+      "bucket": "MVP"
+    },
+    {
+      "id": "M024",
+      "name": "Knowledge Base",
+      "slug": "knowledge_base",
+      "description": "Institution policies, student handbook, teacher handbook, FAQs, AI-searchable content",
+      "priority": "Medium",
+      "bucket": "Enterprise"
+    },
+    {
+      "id": "M025",
+      "name": "Dashboards & Analytics",
+      "slug": "dashboards_analytics",
+      "description": "Role-based dashboards, board analytics, finance analytics, academic analytics",
+      "priority": "Medium",
+      "bucket": "Enterprise"
+    },
+    {
+      "id": "M026",
+      "name": "AI Copilots",
+      "slug": "ai_copilots",
+      "description": "Student tutor, teacher assistant, parent assistant, principal copilot, admissions bot",
+      "priority": "Medium",
+      "bucket": "Enterprise"
+    },
+    {
+      "id": "M027",
+      "name": "Mobile Apps",
+      "slug": "mobile_apps",
+      "description": "Student, parent, teacher, management and transport apps",
+      "priority": "Medium",
+      "bucket": "Enterprise"
+    },
+    {
+      "id": "M028",
+      "name": "Security & Compliance",
+      "slug": "security_compliance",
+      "description": "RBAC, audit logs, data privacy, consent, encryption, backup, tenant isolation",
+      "priority": "Medium",
+      "bucket": "MVP"
+    },
+    {
+      "id": "M029",
+      "name": "Integrations",
+      "slug": "integrations",
+      "description": "WhatsApp, email, SMS, payment gateway, calendar, video meetings, SSO, biometric, RFID",
+      "priority": "Medium",
+      "bucket": "Enterprise"
+    },
+    {
+      "id": "M030",
+      "name": "Administration & Workflow",
+      "slug": "administration_workflow",
+      "description": "Approvals, forms, tasks, notifications, document templates, SLA tracking",
+      "priority": "Medium",
+      "bucket": "Enterprise"
+    }
+  ],
+  "roles": [
+    "Super Admin",
+    "Institution Admin",
+    "Principal",
+    "Vice Principal",
+    "Teacher",
+    "Student",
+    "Parent",
+    "Accountant",
+    "Librarian",
+    "Transport Manager",
+    "Hostel Warden",
+    "HR Manager",
+    "Exam Controller",
+    "Admissions Counselor",
+    "Activity Coordinator",
+    "Cafeteria Manager"
+  ],
+  "rbac": {
+    "Public Website & CMS": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Admissions CRM": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Student Information System": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Parent & Guardian Portal": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Teacher Management": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Employee HRMS": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Academic Configuration": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Curriculum & Lesson Planning": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Timetable & Scheduling": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Attendance": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Homework & Assignments": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Examination Management": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Question Paper Management": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Report Cards & Transcripts": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Library Management": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Digital Learning Repository": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Fees & Billing": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Finance & Accounting": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Meal & Cafeteria": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Transport": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Hostel": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Activities & Events": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "PTM & Communication": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Knowledge Base": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Dashboards & Analytics": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "AI Copilots": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Mobile Apps": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Security & Compliance": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Integrations": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ],
+    "Administration & Workflow": [
+      "Super Admin",
+      "Institution Admin",
+      "Principal",
+      "Vice Principal",
+      "Teacher",
+      "Student",
+      "Parent",
+      "Accountant",
+      "Librarian",
+      "Transport Manager",
+      "Hostel Warden",
+      "HR Manager",
+      "Exam Controller",
+      "Admissions Counselor",
+      "Activity Coordinator",
+      "Cafeteria Manager"
+    ]
+  },
+  "core_entities": [
+    {
+      "entity": "Tenant",
+      "module": "Admissions CRM",
+      "purpose": "Stores tenant master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "Institution",
+      "module": "Student Information System",
+      "purpose": "Stores institution master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "Campus",
+      "module": "Parent & Guardian Portal",
+      "purpose": "Stores campus master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "AcademicYear",
+      "module": "Teacher Management",
+      "purpose": "Stores academicyear master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "Program",
+      "module": "Employee HRMS",
+      "purpose": "Stores program master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "Grade",
+      "module": "Academic Configuration",
+      "purpose": "Stores grade master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "Section",
+      "module": "Curriculum & Lesson Planning",
+      "purpose": "Stores section master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "Semester",
+      "module": "Timetable & Scheduling",
+      "purpose": "Stores semester master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "Subject",
+      "module": "Attendance",
+      "purpose": "Stores subject master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "Topic",
+      "module": "Homework & Assignments",
+      "purpose": "Stores topic master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "Student",
+      "module": "Examination Management",
+      "purpose": "Stores student master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "Guardian",
+      "module": "Question Paper Management",
+      "purpose": "Stores guardian master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "Employee",
+      "module": "Report Cards & Transcripts",
+      "purpose": "Stores employee master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "Teacher",
+      "module": "Library Management",
+      "purpose": "Stores teacher master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "AdmissionLead",
+      "module": "Digital Learning Repository",
+      "purpose": "Stores admissionlead master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "FeePlan",
+      "module": "Fees & Billing",
+      "purpose": "Stores feeplan master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "Invoice",
+      "module": "Finance & Accounting",
+      "purpose": "Stores invoice master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "Payment",
+      "module": "Meal & Cafeteria",
+      "purpose": "Stores payment master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "Exam",
+      "module": "Transport",
+      "purpose": "Stores exam master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "QuestionPaper",
+      "module": "Hostel",
+      "purpose": "Stores questionpaper master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "Marks",
+      "module": "Activities & Events",
+      "purpose": "Stores marks master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "Attendance",
+      "module": "PTM & Communication",
+      "purpose": "Stores attendance master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "Notification",
+      "module": "Student Information System",
+      "purpose": "Stores notification master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "Document",
+      "module": "Parent & Guardian Portal",
+      "purpose": "Stores document master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "AuditLog",
+      "module": "Teacher Management",
+      "purpose": "Stores auditlog master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "User",
+      "module": "Employee HRMS",
+      "purpose": "Stores user master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "Role",
+      "module": "Academic Configuration",
+      "purpose": "Stores role master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "Permission",
+      "module": "Curriculum & Lesson Planning",
+      "purpose": "Stores permission master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    }
+  ],
+  "meta_entities": [
+    {
+      "entity": "LibraryBook",
+      "module": "Knowledge Base",
+      "purpose": "Stores librarybook master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "BookIssue",
+      "module": "Dashboards & Analytics",
+      "purpose": "Stores bookissue master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "MealPlan",
+      "module": "AI Copilots",
+      "purpose": "Stores mealplan master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "MealDistribution",
+      "module": "Mobile Apps",
+      "purpose": "Stores mealdistribution master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "TransportRoute",
+      "module": "Security & Compliance",
+      "purpose": "Stores transportroute master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "Vehicle",
+      "module": "Integrations",
+      "purpose": "Stores vehicle master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "HostelRoom",
+      "module": "Administration & Workflow",
+      "purpose": "Stores hostelroom master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "Activity",
+      "module": "Public Website & CMS",
+      "purpose": "Stores activity master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "Event",
+      "module": "Admissions CRM",
+      "purpose": "Stores event master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "KnowledgeArticle",
+      "module": "Timetable & Scheduling",
+      "purpose": "Stores knowledgearticle master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "AIConversation",
+      "module": "Attendance",
+      "purpose": "Stores aiconversation master/transaction data",
+      "key_fields": "id, tenant_id, status, created_at, updated_at, created_by, updated_by",
+      "relationships": "tenant, user, academic year and related module entities",
+      "indexes": "tenant_id, status, academic_year_id, created_at",
+      "retention": "Soft delete plus immutable audit trail"
+    },
+    {
+      "entity": "PublicWebsiteandCMSConfig",
+      "module": "Public Website & CMS",
+      "purpose": "Entity for Manage Banners",
+      "key_fields": "id, tenant_id, code, name, description, status, metadata_json",
+      "relationships": "Tenant, AuditLog, Notification",
+      "indexes": "tenant_id, code, status",
+      "retention": "Audit all create/update/delete"
+    },
+    {
+      "entity": "AdmissionsCRMConfig",
+      "module": "Admissions CRM",
+      "purpose": "Entity for Capture Inquiry",
+      "key_fields": "id, tenant_id, code, name, description, status, metadata_json",
+      "relationships": "Tenant, AuditLog, Notification",
+      "indexes": "tenant_id, code, status",
+      "retention": "Audit all create/update/delete"
+    },
+    {
+      "entity": "StudentInformationSystemConfig",
+      "module": "Student Information System",
+      "purpose": "Entity for Create Student Profile",
+      "key_fields": "id, tenant_id, code, name, description, status, metadata_json",
+      "relationships": "Tenant, AuditLog, Notification",
+      "indexes": "tenant_id, code, status",
+      "retention": "Audit all create/update/delete"
+    },
+    {
+      "entity": "ParentandGuardianPortalConfig",
+      "module": "Parent & Guardian Portal",
+      "purpose": "Entity for Create Record",
+      "key_fields": "id, tenant_id, code, name, description, status, metadata_json",
+      "relationships": "Tenant, AuditLog, Notification",
+      "indexes": "tenant_id, code, status",
+      "retention": "Audit all create/update/delete"
+    }
+  ],
+  "module_capabilities": {
+    "Public Website & CMS": [
+      {
+        "capability": "Manage Banners",
+        "slug": "manage_banners",
+        "priority": "Could Have",
+        "persona": "Super Admin"
+      },
+      {
+        "capability": "Publish Event Pages",
+        "slug": "publish_event_pages",
+        "priority": "Should Have",
+        "persona": "Institution Admin"
+      },
+      {
+        "capability": "Create Dynamic Pages",
+        "slug": "create_dynamic_pages",
+        "priority": "Must Have",
+        "persona": "Principal"
+      },
+      {
+        "capability": "Upload Photo Galleries",
+        "slug": "upload_photo_galleries",
+        "priority": "Could Have",
+        "persona": "Vice Principal"
+      },
+      {
+        "capability": "Manage Virtual Campus Tour",
+        "slug": "manage_virtual_campus_tour",
+        "priority": "Should Have",
+        "persona": "Teacher"
+      },
+      {
+        "capability": "Configure Seo Metadata",
+        "slug": "configure_seo_metadata",
+        "priority": "Must Have",
+        "persona": "Student"
+      },
+      {
+        "capability": "Publish Admission Notices",
+        "slug": "publish_admission_notices",
+        "priority": "Could Have",
+        "persona": "Parent"
+      },
+      {
+        "capability": "Manage News And Blogs",
+        "slug": "manage_news_and_blogs",
+        "priority": "Should Have",
+        "persona": "Accountant"
+      },
+      {
+        "capability": "Publish Calendar",
+        "slug": "publish_calendar",
+        "priority": "Must Have",
+        "persona": "Librarian"
+      },
+      {
+        "capability": "Manage Downloads",
+        "slug": "manage_downloads",
+        "priority": "Could Have",
+        "persona": "Transport Manager"
+      }
+    ],
+    "Admissions CRM": [
+      {
+        "capability": "Capture Inquiry",
+        "slug": "capture_inquiry",
+        "priority": "Must Have",
+        "persona": "Parent"
+      },
+      {
+        "capability": "Assign Counselor",
+        "slug": "assign_counselor",
+        "priority": "Could Have",
+        "persona": "Accountant"
+      },
+      {
+        "capability": "Schedule Campus Visit",
+        "slug": "schedule_campus_visit",
+        "priority": "Should Have",
+        "persona": "Librarian"
+      },
+      {
+        "capability": "Send Prospectus",
+        "slug": "send_prospectus",
+        "priority": "Must Have",
+        "persona": "Transport Manager"
+      },
+      {
+        "capability": "Manage Entrance Test",
+        "slug": "manage_entrance_test",
+        "priority": "Could Have",
+        "persona": "Hostel Warden"
+      },
+      {
+        "capability": "Upload Documents",
+        "slug": "upload_documents",
+        "priority": "Should Have",
+        "persona": "HR Manager"
+      },
+      {
+        "capability": "Approve Admission",
+        "slug": "approve_admission",
+        "priority": "Must Have",
+        "persona": "Exam Controller"
+      },
+      {
+        "capability": "Generate Admission Offer",
+        "slug": "generate_admission_offer",
+        "priority": "Could Have",
+        "persona": "Admissions Counselor"
+      },
+      {
+        "capability": "Collect Registration Fee",
+        "slug": "collect_registration_fee",
+        "priority": "Should Have",
+        "persona": "Activity Coordinator"
+      },
+      {
+        "capability": "Convert Lead To Student",
+        "slug": "convert_lead_to_student",
+        "priority": "Must Have",
+        "persona": "Cafeteria Manager"
+      }
+    ],
+    "Student Information System": [
+      {
+        "capability": "Create Student Profile",
+        "slug": "create_student_profile",
+        "priority": "Should Have",
+        "persona": "Exam Controller"
+      },
+      {
+        "capability": "Track Promotion",
+        "slug": "track_promotion",
+        "priority": "Must Have",
+        "persona": "Admissions Counselor"
+      },
+      {
+        "capability": "Generate Transfer Certificate",
+        "slug": "generate_transfer_certificate",
+        "priority": "Could Have",
+        "persona": "Activity Coordinator"
+      },
+      {
+        "capability": "Manage Health Records",
+        "slug": "manage_health_records",
+        "priority": "Should Have",
+        "persona": "Cafeteria Manager"
+      },
+      {
+        "capability": "Manage Guardians",
+        "slug": "manage_guardians",
+        "priority": "Must Have",
+        "persona": "Super Admin"
+      },
+      {
+        "capability": "Store Documents",
+        "slug": "store_documents",
+        "priority": "Could Have",
+        "persona": "Institution Admin"
+      },
+      {
+        "capability": "Manage Alumni Conversion",
+        "slug": "manage_alumni_conversion",
+        "priority": "Should Have",
+        "persona": "Principal"
+      },
+      {
+        "capability": "Track Disciplinary Records",
+        "slug": "track_disciplinary_records",
+        "priority": "Must Have",
+        "persona": "Vice Principal"
+      },
+      {
+        "capability": "Manage Scholarship Eligibility",
+        "slug": "manage_scholarship_eligibility",
+        "priority": "Could Have",
+        "persona": "Teacher"
+      },
+      {
+        "capability": "Handle Section Transfer",
+        "slug": "handle_section_transfer",
+        "priority": "Should Have",
+        "persona": "Student"
+      }
+    ],
+    "Parent & Guardian Portal": [
+      {
+        "capability": "Create Record",
+        "slug": "create_record",
+        "priority": "Could Have",
+        "persona": "Principal"
+      },
+      {
+        "capability": "Update Record",
+        "slug": "update_record",
+        "priority": "Should Have",
+        "persona": "Vice Principal"
+      },
+      {
+        "capability": "Approve Workflow",
+        "slug": "approve_workflow",
+        "priority": "Must Have",
+        "persona": "Teacher"
+      },
+      {
+        "capability": "Generate Report",
+        "slug": "generate_report",
+        "priority": "Could Have",
+        "persona": "Student"
+      },
+      {
+        "capability": "Send Notification",
+        "slug": "send_notification",
+        "priority": "Should Have",
+        "persona": "Parent"
+      },
+      {
+        "capability": "Configure Rules",
+        "slug": "configure_rules",
+        "priority": "Must Have",
+        "persona": "Accountant"
+      },
+      {
+        "capability": "Upload Document",
+        "slug": "upload_document",
+        "priority": "Could Have",
+        "persona": "Librarian"
+      },
+      {
+        "capability": "Export Data",
+        "slug": "export_data",
+        "priority": "Should Have",
+        "persona": "Transport Manager"
+      },
+      {
+        "capability": "View Dashboard",
+        "slug": "view_dashboard",
+        "priority": "Must Have",
+        "persona": "Hostel Warden"
+      },
+      {
+        "capability": "Audit Changes",
+        "slug": "audit_changes",
+        "priority": "Could Have",
+        "persona": "HR Manager"
+      }
+    ],
+    "Teacher Management": [
+      {
+        "capability": "Create Record",
+        "slug": "create_record",
+        "priority": "Must Have",
+        "persona": "Librarian"
+      },
+      {
+        "capability": "Update Record",
+        "slug": "update_record",
+        "priority": "Could Have",
+        "persona": "Transport Manager"
+      },
+      {
+        "capability": "Approve Workflow",
+        "slug": "approve_workflow",
+        "priority": "Should Have",
+        "persona": "Hostel Warden"
+      },
+      {
+        "capability": "Generate Report",
+        "slug": "generate_report",
+        "priority": "Must Have",
+        "persona": "HR Manager"
+      },
+      {
+        "capability": "Send Notification",
+        "slug": "send_notification",
+        "priority": "Could Have",
+        "persona": "Exam Controller"
+      },
+      {
+        "capability": "Configure Rules",
+        "slug": "configure_rules",
+        "priority": "Should Have",
+        "persona": "Admissions Counselor"
+      },
+      {
+        "capability": "Upload Document",
+        "slug": "upload_document",
+        "priority": "Must Have",
+        "persona": "Activity Coordinator"
+      },
+      {
+        "capability": "Export Data",
+        "slug": "export_data",
+        "priority": "Could Have",
+        "persona": "Cafeteria Manager"
+      },
+      {
+        "capability": "View Dashboard",
+        "slug": "view_dashboard",
+        "priority": "Should Have",
+        "persona": "Super Admin"
+      },
+      {
+        "capability": "Audit Changes",
+        "slug": "audit_changes",
+        "priority": "Must Have",
+        "persona": "Institution Admin"
+      }
+    ],
+    "Employee HRMS": [
+      {
+        "capability": "Create Record",
+        "slug": "create_record",
+        "priority": "Should Have",
+        "persona": "Activity Coordinator"
+      },
+      {
+        "capability": "Update Record",
+        "slug": "update_record",
+        "priority": "Must Have",
+        "persona": "Cafeteria Manager"
+      },
+      {
+        "capability": "Approve Workflow",
+        "slug": "approve_workflow",
+        "priority": "Could Have",
+        "persona": "Super Admin"
+      },
+      {
+        "capability": "Generate Report",
+        "slug": "generate_report",
+        "priority": "Should Have",
+        "persona": "Institution Admin"
+      },
+      {
+        "capability": "Send Notification",
+        "slug": "send_notification",
+        "priority": "Must Have",
+        "persona": "Principal"
+      },
+      {
+        "capability": "Configure Rules",
+        "slug": "configure_rules",
+        "priority": "Could Have",
+        "persona": "Vice Principal"
+      },
+      {
+        "capability": "Upload Document",
+        "slug": "upload_document",
+        "priority": "Should Have",
+        "persona": "Teacher"
+      },
+      {
+        "capability": "Export Data",
+        "slug": "export_data",
+        "priority": "Must Have",
+        "persona": "Student"
+      },
+      {
+        "capability": "View Dashboard",
+        "slug": "view_dashboard",
+        "priority": "Could Have",
+        "persona": "Parent"
+      },
+      {
+        "capability": "Audit Changes",
+        "slug": "audit_changes",
+        "priority": "Should Have",
+        "persona": "Accountant"
+      }
+    ],
+    "Academic Configuration": [
+      {
+        "capability": "Configure Board",
+        "slug": "configure_board",
+        "priority": "Could Have",
+        "persona": "Teacher"
+      },
+      {
+        "capability": "Configure Grade",
+        "slug": "configure_grade",
+        "priority": "Should Have",
+        "persona": "Student"
+      },
+      {
+        "capability": "Configure Semester",
+        "slug": "configure_semester",
+        "priority": "Must Have",
+        "persona": "Parent"
+      },
+      {
+        "capability": "Configure Term",
+        "slug": "configure_term",
+        "priority": "Could Have",
+        "persona": "Accountant"
+      },
+      {
+        "capability": "Configure Subject",
+        "slug": "configure_subject",
+        "priority": "Should Have",
+        "persona": "Librarian"
+      },
+      {
+        "capability": "Configure Topic",
+        "slug": "configure_topic",
+        "priority": "Must Have",
+        "persona": "Transport Manager"
+      },
+      {
+        "capability": "Configure Chapter",
+        "slug": "configure_chapter",
+        "priority": "Could Have",
+        "persona": "Hostel Warden"
+      },
+      {
+        "capability": "Configure Elective",
+        "slug": "configure_elective",
+        "priority": "Should Have",
+        "persona": "HR Manager"
+      },
+      {
+        "capability": "Configure Credit",
+        "slug": "configure_credit",
+        "priority": "Must Have",
+        "persona": "Exam Controller"
+      },
+      {
+        "capability": "Configure Grading Scale",
+        "slug": "configure_grading_scale",
+        "priority": "Could Have",
+        "persona": "Admissions Counselor"
+      }
+    ],
+    "Curriculum & Lesson Planning": [
+      {
+        "capability": "Create Record",
+        "slug": "create_record",
+        "priority": "Must Have",
+        "persona": "Hostel Warden"
+      },
+      {
+        "capability": "Update Record",
+        "slug": "update_record",
+        "priority": "Could Have",
+        "persona": "HR Manager"
+      },
+      {
+        "capability": "Approve Workflow",
+        "slug": "approve_workflow",
+        "priority": "Should Have",
+        "persona": "Exam Controller"
+      },
+      {
+        "capability": "Generate Report",
+        "slug": "generate_report",
+        "priority": "Must Have",
+        "persona": "Admissions Counselor"
+      },
+      {
+        "capability": "Send Notification",
+        "slug": "send_notification",
+        "priority": "Could Have",
+        "persona": "Activity Coordinator"
+      },
+      {
+        "capability": "Configure Rules",
+        "slug": "configure_rules",
+        "priority": "Should Have",
+        "persona": "Cafeteria Manager"
+      },
+      {
+        "capability": "Upload Document",
+        "slug": "upload_document",
+        "priority": "Must Have",
+        "persona": "Super Admin"
+      },
+      {
+        "capability": "Export Data",
+        "slug": "export_data",
+        "priority": "Could Have",
+        "persona": "Institution Admin"
+      },
+      {
+        "capability": "View Dashboard",
+        "slug": "view_dashboard",
+        "priority": "Should Have",
+        "persona": "Principal"
+      },
+      {
+        "capability": "Audit Changes",
+        "slug": "audit_changes",
+        "priority": "Must Have",
+        "persona": "Vice Principal"
+      }
+    ],
+    "Timetable & Scheduling": [
+      {
+        "capability": "Create Record",
+        "slug": "create_record",
+        "priority": "Should Have",
+        "persona": "Super Admin"
+      },
+      {
+        "capability": "Update Record",
+        "slug": "update_record",
+        "priority": "Must Have",
+        "persona": "Institution Admin"
+      },
+      {
+        "capability": "Approve Workflow",
+        "slug": "approve_workflow",
+        "priority": "Could Have",
+        "persona": "Principal"
+      },
+      {
+        "capability": "Generate Report",
+        "slug": "generate_report",
+        "priority": "Should Have",
+        "persona": "Vice Principal"
+      },
+      {
+        "capability": "Send Notification",
+        "slug": "send_notification",
+        "priority": "Must Have",
+        "persona": "Teacher"
+      },
+      {
+        "capability": "Configure Rules",
+        "slug": "configure_rules",
+        "priority": "Could Have",
+        "persona": "Student"
+      },
+      {
+        "capability": "Upload Document",
+        "slug": "upload_document",
+        "priority": "Should Have",
+        "persona": "Parent"
+      },
+      {
+        "capability": "Export Data",
+        "slug": "export_data",
+        "priority": "Must Have",
+        "persona": "Accountant"
+      },
+      {
+        "capability": "View Dashboard",
+        "slug": "view_dashboard",
+        "priority": "Could Have",
+        "persona": "Librarian"
+      },
+      {
+        "capability": "Audit Changes",
+        "slug": "audit_changes",
+        "priority": "Should Have",
+        "persona": "Transport Manager"
+      }
+    ],
+    "Attendance": [
+      {
+        "capability": "Create Record",
+        "slug": "create_record",
+        "priority": "Could Have",
+        "persona": "Parent"
+      },
+      {
+        "capability": "Update Record",
+        "slug": "update_record",
+        "priority": "Should Have",
+        "persona": "Accountant"
+      },
+      {
+        "capability": "Approve Workflow",
+        "slug": "approve_workflow",
+        "priority": "Must Have",
+        "persona": "Librarian"
+      },
+      {
+        "capability": "Generate Report",
+        "slug": "generate_report",
+        "priority": "Could Have",
+        "persona": "Transport Manager"
+      },
+      {
+        "capability": "Send Notification",
+        "slug": "send_notification",
+        "priority": "Should Have",
+        "persona": "Hostel Warden"
+      },
+      {
+        "capability": "Configure Rules",
+        "slug": "configure_rules",
+        "priority": "Must Have",
+        "persona": "HR Manager"
+      },
+      {
+        "capability": "Upload Document",
+        "slug": "upload_document",
+        "priority": "Could Have",
+        "persona": "Exam Controller"
+      },
+      {
+        "capability": "Export Data",
+        "slug": "export_data",
+        "priority": "Should Have",
+        "persona": "Admissions Counselor"
+      },
+      {
+        "capability": "View Dashboard",
+        "slug": "view_dashboard",
+        "priority": "Must Have",
+        "persona": "Activity Coordinator"
+      },
+      {
+        "capability": "Audit Changes",
+        "slug": "audit_changes",
+        "priority": "Could Have",
+        "persona": "Cafeteria Manager"
+      }
+    ],
+    "Homework & Assignments": [
+      {
+        "capability": "Create Record",
+        "slug": "create_record",
+        "priority": "Must Have",
+        "persona": "Exam Controller"
+      },
+      {
+        "capability": "Update Record",
+        "slug": "update_record",
+        "priority": "Could Have",
+        "persona": "Admissions Counselor"
+      },
+      {
+        "capability": "Approve Workflow",
+        "slug": "approve_workflow",
+        "priority": "Should Have",
+        "persona": "Activity Coordinator"
+      },
+      {
+        "capability": "Generate Report",
+        "slug": "generate_report",
+        "priority": "Must Have",
+        "persona": "Cafeteria Manager"
+      },
+      {
+        "capability": "Send Notification",
+        "slug": "send_notification",
+        "priority": "Could Have",
+        "persona": "Super Admin"
+      },
+      {
+        "capability": "Configure Rules",
+        "slug": "configure_rules",
+        "priority": "Should Have",
+        "persona": "Institution Admin"
+      },
+      {
+        "capability": "Upload Document",
+        "slug": "upload_document",
+        "priority": "Must Have",
+        "persona": "Principal"
+      },
+      {
+        "capability": "Export Data",
+        "slug": "export_data",
+        "priority": "Could Have",
+        "persona": "Vice Principal"
+      },
+      {
+        "capability": "View Dashboard",
+        "slug": "view_dashboard",
+        "priority": "Should Have",
+        "persona": "Teacher"
+      },
+      {
+        "capability": "Audit Changes",
+        "slug": "audit_changes",
+        "priority": "Must Have",
+        "persona": "Student"
+      }
+    ],
+    "Examination Management": [
+      {
+        "capability": "Create Exam Plan",
+        "slug": "create_exam_plan",
+        "priority": "Should Have",
+        "persona": "Principal"
+      },
+      {
+        "capability": "Configure Internal Exam",
+        "slug": "configure_internal_exam",
+        "priority": "Must Have",
+        "persona": "Vice Principal"
+      },
+      {
+        "capability": "Define Subject Paper",
+        "slug": "define_subject_paper",
+        "priority": "Could Have",
+        "persona": "Teacher"
+      },
+      {
+        "capability": "Generate Hall Ticket",
+        "slug": "generate_hall_ticket",
+        "priority": "Should Have",
+        "persona": "Student"
+      },
+      {
+        "capability": "Enter Marks",
+        "slug": "enter_marks",
+        "priority": "Must Have",
+        "persona": "Parent"
+      },
+      {
+        "capability": "Moderate Marks",
+        "slug": "moderate_marks",
+        "priority": "Could Have",
+        "persona": "Accountant"
+      },
+      {
+        "capability": "Calculate Gpa",
+        "slug": "calculate_gpa",
+        "priority": "Should Have",
+        "persona": "Librarian"
+      },
+      {
+        "capability": "Publish Result",
+        "slug": "publish_result",
+        "priority": "Must Have",
+        "persona": "Transport Manager"
+      },
+      {
+        "capability": "Lock Result",
+        "slug": "lock_result",
+        "priority": "Could Have",
+        "persona": "Hostel Warden"
+      },
+      {
+        "capability": "Generate Transcript",
+        "slug": "generate_transcript",
+        "priority": "Should Have",
+        "persona": "HR Manager"
+      }
+    ],
+    "Question Paper Management": [
+      {
+        "capability": "Create Record",
+        "slug": "create_record",
+        "priority": "Could Have",
+        "persona": "Librarian"
+      },
+      {
+        "capability": "Update Record",
+        "slug": "update_record",
+        "priority": "Should Have",
+        "persona": "Transport Manager"
+      },
+      {
+        "capability": "Approve Workflow",
+        "slug": "approve_workflow",
+        "priority": "Must Have",
+        "persona": "Hostel Warden"
+      },
+      {
+        "capability": "Generate Report",
+        "slug": "generate_report",
+        "priority": "Could Have",
+        "persona": "HR Manager"
+      },
+      {
+        "capability": "Send Notification",
+        "slug": "send_notification",
+        "priority": "Should Have",
+        "persona": "Exam Controller"
+      },
+      {
+        "capability": "Configure Rules",
+        "slug": "configure_rules",
+        "priority": "Must Have",
+        "persona": "Admissions Counselor"
+      },
+      {
+        "capability": "Upload Document",
+        "slug": "upload_document",
+        "priority": "Could Have",
+        "persona": "Activity Coordinator"
+      },
+      {
+        "capability": "Export Data",
+        "slug": "export_data",
+        "priority": "Should Have",
+        "persona": "Cafeteria Manager"
+      },
+      {
+        "capability": "View Dashboard",
+        "slug": "view_dashboard",
+        "priority": "Must Have",
+        "persona": "Super Admin"
+      },
+      {
+        "capability": "Audit Changes",
+        "slug": "audit_changes",
+        "priority": "Could Have",
+        "persona": "Institution Admin"
+      }
+    ],
+    "Report Cards & Transcripts": [
+      {
+        "capability": "Create Record",
+        "slug": "create_record",
+        "priority": "Must Have",
+        "persona": "Activity Coordinator"
+      },
+      {
+        "capability": "Update Record",
+        "slug": "update_record",
+        "priority": "Could Have",
+        "persona": "Cafeteria Manager"
+      },
+      {
+        "capability": "Approve Workflow",
+        "slug": "approve_workflow",
+        "priority": "Should Have",
+        "persona": "Super Admin"
+      },
+      {
+        "capability": "Generate Report",
+        "slug": "generate_report",
+        "priority": "Must Have",
+        "persona": "Institution Admin"
+      },
+      {
+        "capability": "Send Notification",
+        "slug": "send_notification",
+        "priority": "Could Have",
+        "persona": "Principal"
+      },
+      {
+        "capability": "Configure Rules",
+        "slug": "configure_rules",
+        "priority": "Should Have",
+        "persona": "Vice Principal"
+      },
+      {
+        "capability": "Upload Document",
+        "slug": "upload_document",
+        "priority": "Must Have",
+        "persona": "Teacher"
+      },
+      {
+        "capability": "Export Data",
+        "slug": "export_data",
+        "priority": "Could Have",
+        "persona": "Student"
+      },
+      {
+        "capability": "View Dashboard",
+        "slug": "view_dashboard",
+        "priority": "Should Have",
+        "persona": "Parent"
+      },
+      {
+        "capability": "Audit Changes",
+        "slug": "audit_changes",
+        "priority": "Must Have",
+        "persona": "Accountant"
+      }
+    ],
+    "Library Management": [
+      {
+        "capability": "Catalog Books",
+        "slug": "catalog_books",
+        "priority": "Should Have",
+        "persona": "Teacher"
+      },
+      {
+        "capability": "Issue Book",
+        "slug": "issue_book",
+        "priority": "Must Have",
+        "persona": "Student"
+      },
+      {
+        "capability": "Return Book",
+        "slug": "return_book",
+        "priority": "Could Have",
+        "persona": "Parent"
+      },
+      {
+        "capability": "Reserve Book",
+        "slug": "reserve_book",
+        "priority": "Should Have",
+        "persona": "Accountant"
+      },
+      {
+        "capability": "Calculate Fine",
+        "slug": "calculate_fine",
+        "priority": "Must Have",
+        "persona": "Librarian"
+      },
+      {
+        "capability": "Manage Digital Ebook",
+        "slug": "manage_digital_ebook",
+        "priority": "Could Have",
+        "persona": "Transport Manager"
+      },
+      {
+        "capability": "Track Lost Book",
+        "slug": "track_lost_book",
+        "priority": "Should Have",
+        "persona": "Hostel Warden"
+      },
+      {
+        "capability": "Recommend Resources",
+        "slug": "recommend_resources",
+        "priority": "Must Have",
+        "persona": "HR Manager"
+      },
+      {
+        "capability": "Manage Accession Register",
+        "slug": "manage_accession_register",
+        "priority": "Could Have",
+        "persona": "Exam Controller"
+      },
+      {
+        "capability": "Manage Library Membership",
+        "slug": "manage_library_membership",
+        "priority": "Should Have",
+        "persona": "Admissions Counselor"
+      }
+    ],
+    "Digital Learning Repository": [
+      {
+        "capability": "Create Record",
+        "slug": "create_record",
+        "priority": "Could Have",
+        "persona": "Hostel Warden"
+      },
+      {
+        "capability": "Update Record",
+        "slug": "update_record",
+        "priority": "Should Have",
+        "persona": "HR Manager"
+      },
+      {
+        "capability": "Approve Workflow",
+        "slug": "approve_workflow",
+        "priority": "Must Have",
+        "persona": "Exam Controller"
+      },
+      {
+        "capability": "Generate Report",
+        "slug": "generate_report",
+        "priority": "Could Have",
+        "persona": "Admissions Counselor"
+      },
+      {
+        "capability": "Send Notification",
+        "slug": "send_notification",
+        "priority": "Should Have",
+        "persona": "Activity Coordinator"
+      },
+      {
+        "capability": "Configure Rules",
+        "slug": "configure_rules",
+        "priority": "Must Have",
+        "persona": "Cafeteria Manager"
+      },
+      {
+        "capability": "Upload Document",
+        "slug": "upload_document",
+        "priority": "Could Have",
+        "persona": "Super Admin"
+      },
+      {
+        "capability": "Export Data",
+        "slug": "export_data",
+        "priority": "Should Have",
+        "persona": "Institution Admin"
+      },
+      {
+        "capability": "View Dashboard",
+        "slug": "view_dashboard",
+        "priority": "Must Have",
+        "persona": "Principal"
+      },
+      {
+        "capability": "Audit Changes",
+        "slug": "audit_changes",
+        "priority": "Could Have",
+        "persona": "Vice Principal"
+      }
+    ],
+    "Fees & Billing": [
+      {
+        "capability": "Configure Fee Head",
+        "slug": "configure_fee_head",
+        "priority": "Must Have",
+        "persona": "Super Admin"
+      },
+      {
+        "capability": "Map Fee To Grade",
+        "slug": "map_fee_to_grade",
+        "priority": "Could Have",
+        "persona": "Institution Admin"
+      },
+      {
+        "capability": "Create Activity Charge",
+        "slug": "create_activity_charge",
+        "priority": "Should Have",
+        "persona": "Principal"
+      },
+      {
+        "capability": "Send Reminder",
+        "slug": "send_reminder",
+        "priority": "Must Have",
+        "persona": "Vice Principal"
+      },
+      {
+        "capability": "Collect Fee",
+        "slug": "collect_fee",
+        "priority": "Could Have",
+        "persona": "Teacher"
+      },
+      {
+        "capability": "Generate Receipt",
+        "slug": "generate_receipt",
+        "priority": "Should Have",
+        "persona": "Student"
+      },
+      {
+        "capability": "Process Refund",
+        "slug": "process_refund",
+        "priority": "Must Have",
+        "persona": "Parent"
+      },
+      {
+        "capability": "Apply Concession",
+        "slug": "apply_concession",
+        "priority": "Could Have",
+        "persona": "Accountant"
+      },
+      {
+        "capability": "Track Dues",
+        "slug": "track_dues",
+        "priority": "Should Have",
+        "persona": "Librarian"
+      },
+      {
+        "capability": "Export Reconciliation",
+        "slug": "export_reconciliation",
+        "priority": "Must Have",
+        "persona": "Transport Manager"
+      }
+    ],
+    "Finance & Accounting": [
+      {
+        "capability": "Create Record",
+        "slug": "create_record",
+        "priority": "Should Have",
+        "persona": "Parent"
+      },
+      {
+        "capability": "Update Record",
+        "slug": "update_record",
+        "priority": "Must Have",
+        "persona": "Accountant"
+      },
+      {
+        "capability": "Approve Workflow",
+        "slug": "approve_workflow",
+        "priority": "Could Have",
+        "persona": "Librarian"
+      },
+      {
+        "capability": "Generate Report",
+        "slug": "generate_report",
+        "priority": "Should Have",
+        "persona": "Transport Manager"
+      },
+      {
+        "capability": "Send Notification",
+        "slug": "send_notification",
+        "priority": "Must Have",
+        "persona": "Hostel Warden"
+      },
+      {
+        "capability": "Configure Rules",
+        "slug": "configure_rules",
+        "priority": "Could Have",
+        "persona": "HR Manager"
+      },
+      {
+        "capability": "Upload Document",
+        "slug": "upload_document",
+        "priority": "Should Have",
+        "persona": "Exam Controller"
+      },
+      {
+        "capability": "Export Data",
+        "slug": "export_data",
+        "priority": "Must Have",
+        "persona": "Admissions Counselor"
+      },
+      {
+        "capability": "View Dashboard",
+        "slug": "view_dashboard",
+        "priority": "Could Have",
+        "persona": "Activity Coordinator"
+      },
+      {
+        "capability": "Audit Changes",
+        "slug": "audit_changes",
+        "priority": "Should Have",
+        "persona": "Cafeteria Manager"
+      }
+    ],
+    "Meal & Cafeteria": [
+      {
+        "capability": "Define Menu",
+        "slug": "define_menu",
+        "priority": "Could Have",
+        "persona": "Exam Controller"
+      },
+      {
+        "capability": "Track Meal Distribution",
+        "slug": "track_meal_distribution",
+        "priority": "Should Have",
+        "persona": "Admissions Counselor"
+      },
+      {
+        "capability": "Scan Qr Meal Token",
+        "slug": "scan_qr_meal_token",
+        "priority": "Must Have",
+        "persona": "Activity Coordinator"
+      },
+      {
+        "capability": "Manage Meal Subscription",
+        "slug": "manage_meal_subscription",
+        "priority": "Could Have",
+        "persona": "Cafeteria Manager"
+      },
+      {
+        "capability": "Track Inventory",
+        "slug": "track_inventory",
+        "priority": "Should Have",
+        "persona": "Super Admin"
+      },
+      {
+        "capability": "Raise Purchase Request",
+        "slug": "raise_purchase_request",
+        "priority": "Must Have",
+        "persona": "Institution Admin"
+      },
+      {
+        "capability": "Manage Vendor",
+        "slug": "manage_vendor",
+        "priority": "Could Have",
+        "persona": "Principal"
+      },
+      {
+        "capability": "Record Nutrition Data",
+        "slug": "record_nutrition_data",
+        "priority": "Should Have",
+        "persona": "Vice Principal"
+      },
+      {
+        "capability": "Generate Meal Report",
+        "slug": "generate_meal_report",
+        "priority": "Must Have",
+        "persona": "Teacher"
+      },
+      {
+        "capability": "Notify Parents",
+        "slug": "notify_parents",
+        "priority": "Could Have",
+        "persona": "Student"
+      }
+    ],
+    "Transport": [
+      {
+        "capability": "Create Record",
+        "slug": "create_record",
+        "priority": "Must Have",
+        "persona": "Principal"
+      },
+      {
+        "capability": "Update Record",
+        "slug": "update_record",
+        "priority": "Could Have",
+        "persona": "Vice Principal"
+      },
+      {
+        "capability": "Approve Workflow",
+        "slug": "approve_workflow",
+        "priority": "Should Have",
+        "persona": "Teacher"
+      },
+      {
+        "capability": "Generate Report",
+        "slug": "generate_report",
+        "priority": "Must Have",
+        "persona": "Student"
+      },
+      {
+        "capability": "Send Notification",
+        "slug": "send_notification",
+        "priority": "Could Have",
+        "persona": "Parent"
+      },
+      {
+        "capability": "Configure Rules",
+        "slug": "configure_rules",
+        "priority": "Should Have",
+        "persona": "Accountant"
+      },
+      {
+        "capability": "Upload Document",
+        "slug": "upload_document",
+        "priority": "Must Have",
+        "persona": "Librarian"
+      },
+      {
+        "capability": "Export Data",
+        "slug": "export_data",
+        "priority": "Could Have",
+        "persona": "Transport Manager"
+      },
+      {
+        "capability": "View Dashboard",
+        "slug": "view_dashboard",
+        "priority": "Should Have",
+        "persona": "Hostel Warden"
+      },
+      {
+        "capability": "Audit Changes",
+        "slug": "audit_changes",
+        "priority": "Must Have",
+        "persona": "HR Manager"
+      }
+    ],
+    "Hostel": [
+      {
+        "capability": "Create Record",
+        "slug": "create_record",
+        "priority": "Should Have",
+        "persona": "Librarian"
+      },
+      {
+        "capability": "Update Record",
+        "slug": "update_record",
+        "priority": "Must Have",
+        "persona": "Transport Manager"
+      },
+      {
+        "capability": "Approve Workflow",
+        "slug": "approve_workflow",
+        "priority": "Could Have",
+        "persona": "Hostel Warden"
+      },
+      {
+        "capability": "Generate Report",
+        "slug": "generate_report",
+        "priority": "Should Have",
+        "persona": "HR Manager"
+      },
+      {
+        "capability": "Send Notification",
+        "slug": "send_notification",
+        "priority": "Must Have",
+        "persona": "Exam Controller"
+      },
+      {
+        "capability": "Configure Rules",
+        "slug": "configure_rules",
+        "priority": "Could Have",
+        "persona": "Admissions Counselor"
+      },
+      {
+        "capability": "Upload Document",
+        "slug": "upload_document",
+        "priority": "Should Have",
+        "persona": "Activity Coordinator"
+      },
+      {
+        "capability": "Export Data",
+        "slug": "export_data",
+        "priority": "Must Have",
+        "persona": "Cafeteria Manager"
+      },
+      {
+        "capability": "View Dashboard",
+        "slug": "view_dashboard",
+        "priority": "Could Have",
+        "persona": "Super Admin"
+      },
+      {
+        "capability": "Audit Changes",
+        "slug": "audit_changes",
+        "priority": "Should Have",
+        "persona": "Institution Admin"
+      }
+    ],
+    "Activities & Events": [
+      {
+        "capability": "Create Activity",
+        "slug": "create_activity",
+        "priority": "Could Have",
+        "persona": "Activity Coordinator"
+      },
+      {
+        "capability": "Open Registration",
+        "slug": "open_registration",
+        "priority": "Should Have",
+        "persona": "Cafeteria Manager"
+      },
+      {
+        "capability": "Collect Activity Charge",
+        "slug": "collect_activity_charge",
+        "priority": "Must Have",
+        "persona": "Super Admin"
+      },
+      {
+        "capability": "Track Participation",
+        "slug": "track_participation",
+        "priority": "Could Have",
+        "persona": "Institution Admin"
+      },
+      {
+        "capability": "Issue Certificate",
+        "slug": "issue_certificate",
+        "priority": "Should Have",
+        "persona": "Principal"
+      },
+      {
+        "capability": "Manage Summer Camp",
+        "slug": "manage_summer_camp",
+        "priority": "Must Have",
+        "persona": "Vice Principal"
+      },
+      {
+        "capability": "Manage Off-Campus Activity",
+        "slug": "manage_off_campus_activity",
+        "priority": "Could Have",
+        "persona": "Teacher"
+      },
+      {
+        "capability": "Collect Consent",
+        "slug": "collect_consent",
+        "priority": "Should Have",
+        "persona": "Student"
+      },
+      {
+        "capability": "Publish Gallery",
+        "slug": "publish_gallery",
+        "priority": "Must Have",
+        "persona": "Parent"
+      },
+      {
+        "capability": "Send Event Notifications",
+        "slug": "send_event_notifications",
+        "priority": "Could Have",
+        "persona": "Accountant"
+      }
+    ],
+    "PTM & Communication": [
+      {
+        "capability": "Create Circular",
+        "slug": "create_circular",
+        "priority": "Must Have",
+        "persona": "Teacher"
+      },
+      {
+        "capability": "Send Whatsapp Alert",
+        "slug": "send_whatsapp_alert",
+        "priority": "Could Have",
+        "persona": "Student"
+      },
+      {
+        "capability": "Send Email Campaign",
+        "slug": "send_email_campaign",
+        "priority": "Should Have",
+        "persona": "Parent"
+      },
+      {
+        "capability": "Schedule Ptm",
+        "slug": "schedule_ptm",
+        "priority": "Must Have",
+        "persona": "Accountant"
+      },
+      {
+        "capability": "Capture Meeting Notes",
+        "slug": "capture_meeting_notes",
+        "priority": "Could Have",
+        "persona": "Librarian"
+      },
+      {
+        "capability": "Send Push Notification",
+        "slug": "send_push_notification",
+        "priority": "Should Have",
+        "persona": "Transport Manager"
+      },
+      {
+        "capability": "Manage Templates",
+        "slug": "manage_templates",
+        "priority": "Must Have",
+        "persona": "Hostel Warden"
+      },
+      {
+        "capability": "Track Delivery",
+        "slug": "track_delivery",
+        "priority": "Could Have",
+        "persona": "HR Manager"
+      },
+      {
+        "capability": "Send Emergency Alert",
+        "slug": "send_emergency_alert",
+        "priority": "Should Have",
+        "persona": "Exam Controller"
+      },
+      {
+        "capability": "Collect Parent Feedback",
+        "slug": "collect_parent_feedback",
+        "priority": "Must Have",
+        "persona": "Admissions Counselor"
+      }
+    ],
+    "Knowledge Base": [
+      {
+        "capability": "Create Record",
+        "slug": "create_record",
+        "priority": "Should Have",
+        "persona": "Hostel Warden"
+      },
+      {
+        "capability": "Update Record",
+        "slug": "update_record",
+        "priority": "Must Have",
+        "persona": "HR Manager"
+      },
+      {
+        "capability": "Approve Workflow",
+        "slug": "approve_workflow",
+        "priority": "Could Have",
+        "persona": "Exam Controller"
+      },
+      {
+        "capability": "Generate Report",
+        "slug": "generate_report",
+        "priority": "Should Have",
+        "persona": "Admissions Counselor"
+      },
+      {
+        "capability": "Send Notification",
+        "slug": "send_notification",
+        "priority": "Must Have",
+        "persona": "Activity Coordinator"
+      },
+      {
+        "capability": "Configure Rules",
+        "slug": "configure_rules",
+        "priority": "Could Have",
+        "persona": "Cafeteria Manager"
+      },
+      {
+        "capability": "Upload Document",
+        "slug": "upload_document",
+        "priority": "Should Have",
+        "persona": "Super Admin"
+      },
+      {
+        "capability": "Export Data",
+        "slug": "export_data",
+        "priority": "Must Have",
+        "persona": "Institution Admin"
+      },
+      {
+        "capability": "View Dashboard",
+        "slug": "view_dashboard",
+        "priority": "Could Have",
+        "persona": "Principal"
+      },
+      {
+        "capability": "Audit Changes",
+        "slug": "audit_changes",
+        "priority": "Should Have",
+        "persona": "Vice Principal"
+      }
+    ],
+    "Dashboards & Analytics": [
+      {
+        "capability": "Create Record",
+        "slug": "create_record",
+        "priority": "Could Have",
+        "persona": "Super Admin"
+      },
+      {
+        "capability": "Update Record",
+        "slug": "update_record",
+        "priority": "Should Have",
+        "persona": "Institution Admin"
+      },
+      {
+        "capability": "Approve Workflow",
+        "slug": "approve_workflow",
+        "priority": "Must Have",
+        "persona": "Principal"
+      },
+      {
+        "capability": "Generate Report",
+        "slug": "generate_report",
+        "priority": "Could Have",
+        "persona": "Vice Principal"
+      },
+      {
+        "capability": "Send Notification",
+        "slug": "send_notification",
+        "priority": "Should Have",
+        "persona": "Teacher"
+      },
+      {
+        "capability": "Configure Rules",
+        "slug": "configure_rules",
+        "priority": "Must Have",
+        "persona": "Student"
+      },
+      {
+        "capability": "Upload Document",
+        "slug": "upload_document",
+        "priority": "Could Have",
+        "persona": "Parent"
+      },
+      {
+        "capability": "Export Data",
+        "slug": "export_data",
+        "priority": "Should Have",
+        "persona": "Accountant"
+      },
+      {
+        "capability": "View Dashboard",
+        "slug": "view_dashboard",
+        "priority": "Must Have",
+        "persona": "Librarian"
+      },
+      {
+        "capability": "Audit Changes",
+        "slug": "audit_changes",
+        "priority": "Could Have",
+        "persona": "Transport Manager"
+      }
+    ],
+    "AI Copilots": [
+      {
+        "capability": "Answer Student Query",
+        "slug": "answer_student_query",
+        "priority": "Must Have",
+        "persona": "Parent"
+      },
+      {
+        "capability": "Generate Lesson Plan",
+        "slug": "generate_lesson_plan",
+        "priority": "Could Have",
+        "persona": "Accountant"
+      },
+      {
+        "capability": "Generate Question Paper",
+        "slug": "generate_question_paper",
+        "priority": "Should Have",
+        "persona": "Librarian"
+      },
+      {
+        "capability": "Summarize Child Progress",
+        "slug": "summarize_child_progress",
+        "priority": "Must Have",
+        "persona": "Transport Manager"
+      },
+      {
+        "capability": "Predict Fee Default Risk",
+        "slug": "predict_fee_default_risk",
+        "priority": "Could Have",
+        "persona": "Hostel Warden"
+      },
+      {
+        "capability": "Predict Dropout Risk",
+        "slug": "predict_dropout_risk",
+        "priority": "Should Have",
+        "persona": "HR Manager"
+      },
+      {
+        "capability": "Generate Teacher Remark",
+        "slug": "generate_teacher_remark",
+        "priority": "Must Have",
+        "persona": "Exam Controller"
+      },
+      {
+        "capability": "Search Knowledge Base",
+        "slug": "search_knowledge_base",
+        "priority": "Could Have",
+        "persona": "Admissions Counselor"
+      },
+      {
+        "capability": "Create Quiz",
+        "slug": "create_quiz",
+        "priority": "Should Have",
+        "persona": "Activity Coordinator"
+      },
+      {
+        "capability": "Recommend Learning Path",
+        "slug": "recommend_learning_path",
+        "priority": "Must Have",
+        "persona": "Cafeteria Manager"
+      }
+    ],
+    "Mobile Apps": [
+      {
+        "capability": "Create Record",
+        "slug": "create_record",
+        "priority": "Should Have",
+        "persona": "Exam Controller"
+      },
+      {
+        "capability": "Update Record",
+        "slug": "update_record",
+        "priority": "Must Have",
+        "persona": "Admissions Counselor"
+      },
+      {
+        "capability": "Approve Workflow",
+        "slug": "approve_workflow",
+        "priority": "Could Have",
+        "persona": "Activity Coordinator"
+      },
+      {
+        "capability": "Generate Report",
+        "slug": "generate_report",
+        "priority": "Should Have",
+        "persona": "Cafeteria Manager"
+      },
+      {
+        "capability": "Send Notification",
+        "slug": "send_notification",
+        "priority": "Must Have",
+        "persona": "Super Admin"
+      },
+      {
+        "capability": "Configure Rules",
+        "slug": "configure_rules",
+        "priority": "Could Have",
+        "persona": "Institution Admin"
+      },
+      {
+        "capability": "Upload Document",
+        "slug": "upload_document",
+        "priority": "Should Have",
+        "persona": "Principal"
+      },
+      {
+        "capability": "Export Data",
+        "slug": "export_data",
+        "priority": "Must Have",
+        "persona": "Vice Principal"
+      },
+      {
+        "capability": "View Dashboard",
+        "slug": "view_dashboard",
+        "priority": "Could Have",
+        "persona": "Teacher"
+      },
+      {
+        "capability": "Audit Changes",
+        "slug": "audit_changes",
+        "priority": "Should Have",
+        "persona": "Student"
+      }
+    ],
+    "Security & Compliance": [
+      {
+        "capability": "Create Record",
+        "slug": "create_record",
+        "priority": "Could Have",
+        "persona": "Principal"
+      },
+      {
+        "capability": "Update Record",
+        "slug": "update_record",
+        "priority": "Should Have",
+        "persona": "Vice Principal"
+      },
+      {
+        "capability": "Approve Workflow",
+        "slug": "approve_workflow",
+        "priority": "Must Have",
+        "persona": "Teacher"
+      },
+      {
+        "capability": "Generate Report",
+        "slug": "generate_report",
+        "priority": "Could Have",
+        "persona": "Student"
+      },
+      {
+        "capability": "Send Notification",
+        "slug": "send_notification",
+        "priority": "Should Have",
+        "persona": "Parent"
+      },
+      {
+        "capability": "Configure Rules",
+        "slug": "configure_rules",
+        "priority": "Must Have",
+        "persona": "Accountant"
+      },
+      {
+        "capability": "Upload Document",
+        "slug": "upload_document",
+        "priority": "Could Have",
+        "persona": "Librarian"
+      },
+      {
+        "capability": "Export Data",
+        "slug": "export_data",
+        "priority": "Should Have",
+        "persona": "Transport Manager"
+      },
+      {
+        "capability": "View Dashboard",
+        "slug": "view_dashboard",
+        "priority": "Must Have",
+        "persona": "Hostel Warden"
+      },
+      {
+        "capability": "Audit Changes",
+        "slug": "audit_changes",
+        "priority": "Could Have",
+        "persona": "HR Manager"
+      }
+    ],
+    "Integrations": [
+      {
+        "capability": "Create Record",
+        "slug": "create_record",
+        "priority": "Must Have",
+        "persona": "Librarian"
+      },
+      {
+        "capability": "Update Record",
+        "slug": "update_record",
+        "priority": "Could Have",
+        "persona": "Transport Manager"
+      },
+      {
+        "capability": "Approve Workflow",
+        "slug": "approve_workflow",
+        "priority": "Should Have",
+        "persona": "Hostel Warden"
+      },
+      {
+        "capability": "Generate Report",
+        "slug": "generate_report",
+        "priority": "Must Have",
+        "persona": "HR Manager"
+      },
+      {
+        "capability": "Send Notification",
+        "slug": "send_notification",
+        "priority": "Could Have",
+        "persona": "Exam Controller"
+      },
+      {
+        "capability": "Configure Rules",
+        "slug": "configure_rules",
+        "priority": "Should Have",
+        "persona": "Admissions Counselor"
+      },
+      {
+        "capability": "Upload Document",
+        "slug": "upload_document",
+        "priority": "Must Have",
+        "persona": "Activity Coordinator"
+      },
+      {
+        "capability": "Export Data",
+        "slug": "export_data",
+        "priority": "Could Have",
+        "persona": "Cafeteria Manager"
+      },
+      {
+        "capability": "View Dashboard",
+        "slug": "view_dashboard",
+        "priority": "Should Have",
+        "persona": "Super Admin"
+      },
+      {
+        "capability": "Audit Changes",
+        "slug": "audit_changes",
+        "priority": "Must Have",
+        "persona": "Institution Admin"
+      }
+    ],
+    "Administration & Workflow": [
+      {
+        "capability": "Create Record",
+        "slug": "create_record",
+        "priority": "Should Have",
+        "persona": "Activity Coordinator"
+      },
+      {
+        "capability": "Update Record",
+        "slug": "update_record",
+        "priority": "Must Have",
+        "persona": "Cafeteria Manager"
+      },
+      {
+        "capability": "Approve Workflow",
+        "slug": "approve_workflow",
+        "priority": "Could Have",
+        "persona": "Super Admin"
+      },
+      {
+        "capability": "Generate Report",
+        "slug": "generate_report",
+        "priority": "Should Have",
+        "persona": "Institution Admin"
+      },
+      {
+        "capability": "Send Notification",
+        "slug": "send_notification",
+        "priority": "Must Have",
+        "persona": "Principal"
+      },
+      {
+        "capability": "Configure Rules",
+        "slug": "configure_rules",
+        "priority": "Could Have",
+        "persona": "Vice Principal"
+      },
+      {
+        "capability": "Upload Document",
+        "slug": "upload_document",
+        "priority": "Should Have",
+        "persona": "Teacher"
+      },
+      {
+        "capability": "Export Data",
+        "slug": "export_data",
+        "priority": "Must Have",
+        "persona": "Student"
+      },
+      {
+        "capability": "View Dashboard",
+        "slug": "view_dashboard",
+        "priority": "Could Have",
+        "persona": "Parent"
+      },
+      {
+        "capability": "Audit Changes",
+        "slug": "audit_changes",
+        "priority": "Should Have",
+        "persona": "Accountant"
+      }
+    ]
+  },
+  "counts": {
+    "modules": 30,
+    "roles": 16,
+    "features": 2100,
+    "apis": 900,
+    "screens": 210,
+    "core_entities": 28,
+    "meta_entities": 15
+  }
+}

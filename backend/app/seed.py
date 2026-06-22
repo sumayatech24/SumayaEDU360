@@ -236,6 +236,21 @@ MASTERS: dict[str, tuple[str, list[str]]] = {
     "book_issue_status": ("Book Issue Status", ["Issued", "Returned", "Overdue", "Lost"]),
     "hostel_allocation_status": ("Hostel Allocation Status", ["Allocated", "Vacated"]),
     "leave_status": ("Leave Status", ["Applied", "Approved", "Rejected", "Cancelled"]),
+    "homework_status": ("Homework Status", ["Assigned", "Closed"]),
+    "submission_status": ("Submission Status", ["Submitted", "Graded", "Late", "Missing"]),
+    "lesson_plan_status": ("Lesson Plan Status", ["Planned", "In Progress", "Completed"]),
+    "day_of_week": ("Day of Week", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]),
+    "account_type": ("Account Type", ["Asset", "Liability", "Income", "Expense", "Equity"]),
+    "expense_status": ("Expense Status", ["Pending", "Approved", "Rejected", "Paid"]),
+    "po_status": ("PO Status", ["Draft", "Ordered", "Received", "Cancelled"]),
+    "movement_type": ("Stock Movement Type", ["In", "Out"]),
+    "activity_type": ("Activity Type", ["Club", "Sport", "Competition", "Camp", "Cultural"]),
+    "registration_status": ("Registration Status", ["Registered", "Cancelled", "Attended"]),
+    "meal_type": ("Meal Type", ["Breakfast", "Lunch", "Snacks", "Dinner"]),
+    "audience": ("Audience", ["All", "Students", "Parents", "Teachers", "Staff"]),
+    "comm_channel": ("Communication Channel", ["In App", "Email", "SMS", "WhatsApp", "Push"]),
+    "announcement_status": ("Announcement Status", ["Draft", "Published", "Archived"]),
+    "cms_page_type": ("CMS Page Type", ["Page", "News", "Event", "Blog"]),
 }
 
 # Typed module pages handled by dedicated React screens (slug -> path).

@@ -18,7 +18,15 @@ from typing import Optional, Type
 from pydantic import BaseModel, ConfigDict, create_model
 
 from app.core.database import Base
-from app.models import hostel, hr, library, transport
+from app.models import (
+    academics_ops,
+    finance,
+    hostel,
+    hr,
+    library,
+    operations,
+    transport,
+)
 
 # --------------------------------------------------------------------------- specs
 PY_TYPES: dict[str, type] = {
@@ -215,6 +223,219 @@ DOMAIN_SPECS: list[EntitySpec] = [
             _f("deductions", "Deductions", "decimal"),
             _f("net_pay", "Net Pay", "decimal"),
             _f("payroll_status", "Status"),
+        ],
+    ),
+    # ----------------------------------------------------------------- Homework & Assignments
+    EntitySpec(
+        academics_ops.Homework, "homework", "Homework", "homework_assignments",
+        kind="transaction", icon="edit", search_fields=["title"],
+        fields=[
+            _f("title", "Title", required=True),
+            _f("grade_id", "Grade", "reference", reference_entity="grade"),
+            _f("section_id", "Section", "reference", reference_entity="section"),
+            _f("subject_id", "Subject", "reference", reference_entity="subject"),
+            _f("assigned_date", "Assigned", "date"),
+            _f("due_date", "Due", "date"),
+            _f("description", "Description", "text", list_visible=False),
+            _f("max_marks", "Max Marks", "decimal"),
+            _f("homework_status", "Status", "select", options_master="homework_status"),
+        ],
+    ),
+    EntitySpec(
+        academics_ops.HomeworkSubmission, "homework-submission", "Homework Submission", "homework_assignments",
+        kind="transaction", icon="check-square", search_fields=[],
+        fields=[
+            _f("homework_id", "Homework", "reference", required=True, reference_entity="homework"),
+            _f("student_id", "Student", "reference", required=True, reference_entity="student"),
+            _f("submitted_date", "Submitted", "date"),
+            _f("content", "Content", "text", list_visible=False),
+            _f("marks_awarded", "Marks", "decimal"),
+            _f("submission_status", "Status", "select", options_master="submission_status"),
+        ],
+    ),
+    # ----------------------------------------------------------------- Timetable
+    EntitySpec(
+        academics_ops.TimetablePeriod, "timetable-period", "Timetable Period", "timetable_scheduling",
+        kind="transaction", icon="grid", search_fields=["day_of_week", "room"],
+        fields=[
+            _f("grade_id", "Grade", "reference", reference_entity="grade"),
+            _f("section_id", "Section", "reference", reference_entity="section"),
+            _f("subject_id", "Subject", "reference", reference_entity="subject"),
+            _f("day_of_week", "Day", "select", required=True, options_master="day_of_week"),
+            _f("period_no", "Period", "number", required=True),
+            _f("start_time", "Start", "time"),
+            _f("end_time", "End", "time"),
+            _f("room", "Room"),
+        ],
+    ),
+    # ----------------------------------------------------------------- Lesson Plans
+    EntitySpec(
+        academics_ops.LessonPlan, "lesson-plan", "Lesson Plan", "curriculum_lesson_planning",
+        kind="transaction", icon="book", search_fields=["title"],
+        fields=[
+            _f("title", "Title", required=True),
+            _f("subject_id", "Subject", "reference", reference_entity="subject"),
+            _f("grade_id", "Grade", "reference", reference_entity="grade"),
+            _f("week_no", "Week", "number"),
+            _f("objectives", "Objectives", "text", list_visible=False),
+            _f("resources", "Resources", "text", list_visible=False),
+            _f("completion_percent", "Completion %", "number"),
+            _f("plan_status", "Status", "select", options_master="lesson_plan_status"),
+        ],
+    ),
+    # ----------------------------------------------------------------- Finance & Accounting
+    EntitySpec(
+        finance.LedgerAccount, "ledger-account", "Ledger Account", "finance_accounting",
+        kind="master", icon="credit-card", search_fields=["name", "code"],
+        fields=[
+            _f("name", "Name", required=True),
+            _f("code", "Code", required=True),
+            _f("account_type", "Type", "select", options_master="account_type"),
+            _f("opening_balance", "Opening Balance", "decimal"),
+        ],
+    ),
+    EntitySpec(
+        finance.Vendor, "vendor", "Vendor", "finance_accounting",
+        kind="master", icon="briefcase", search_fields=["name", "code", "phone"],
+        fields=[
+            _f("name", "Name", required=True),
+            _f("code", "Code", required=True),
+            _f("contact_person", "Contact"),
+            _f("phone", "Phone", "phone"),
+            _f("email", "Email", "email"),
+            _f("gst_no", "GST No"),
+        ],
+    ),
+    EntitySpec(
+        finance.Expense, "expense", "Expense", "finance_accounting",
+        kind="transaction", icon="credit-card", search_fields=["expense_no"],
+        fields=[
+            _f("expense_no", "Expense No", required=True),
+            _f("account_id", "Account", "reference", reference_entity="ledger-account"),
+            _f("vendor_id", "Vendor", "reference", reference_entity="vendor"),
+            _f("expense_date", "Date", "date"),
+            _f("amount", "Amount", "decimal", required=True),
+            _f("description", "Description", "text", list_visible=False),
+            _f("approval_status", "Status", "select", options_master="expense_status"),
+        ],
+    ),
+    EntitySpec(
+        finance.PurchaseOrder, "purchase-order", "Purchase Order", "finance_accounting",
+        kind="transaction", icon="briefcase", search_fields=["po_no"],
+        fields=[
+            _f("po_no", "PO No", required=True),
+            _f("vendor_id", "Vendor", "reference", reference_entity="vendor"),
+            _f("order_date", "Order Date", "date"),
+            _f("total_amount", "Total", "decimal"),
+            _f("po_status", "Status", "select", options_master="po_status"),
+            _f("notes", "Notes", "text", list_visible=False),
+        ],
+    ),
+    # ----------------------------------------------------------------- Inventory / Store
+    EntitySpec(
+        operations.InventoryItem, "inventory-item", "Inventory Item", "finance_accounting",
+        kind="master", icon="table", search_fields=["name", "code"],
+        fields=[
+            _f("name", "Name", required=True),
+            _f("code", "Code", required=True),
+            _f("category", "Category"),
+            _f("unit", "Unit"),
+            _f("quantity_on_hand", "Qty on Hand", "number"),
+            _f("reorder_level", "Reorder Level", "number"),
+            _f("unit_cost", "Unit Cost", "decimal"),
+        ],
+    ),
+    EntitySpec(
+        operations.StockMovement, "stock-movement", "Stock Movement", "finance_accounting",
+        kind="transaction", icon="trending-up", search_fields=["reference"],
+        fields=[
+            _f("item_id", "Item", "reference", required=True, reference_entity="inventory-item"),
+            _f("movement_type", "Type", "select", options_master="movement_type"),
+            _f("quantity", "Quantity", "number", required=True),
+            _f("reference", "Reference"),
+            _f("movement_date", "Date", "date"),
+        ],
+    ),
+    # ----------------------------------------------------------------- Activities & Events
+    EntitySpec(
+        operations.Activity, "activity", "Activity", "activities_events",
+        kind="master", icon="trending-up", search_fields=["name", "code"],
+        fields=[
+            _f("name", "Name", required=True),
+            _f("code", "Code", required=True),
+            _f("activity_type", "Type", "select", options_master="activity_type"),
+            _f("coordinator", "Coordinator"),
+            _f("start_date", "Start Date", "date"),
+            _f("fee", "Fee", "decimal"),
+            _f("capacity", "Capacity", "number"),
+        ],
+    ),
+    EntitySpec(
+        operations.ActivityRegistration, "activity-registration", "Activity Registration", "activities_events",
+        kind="transaction", icon="users", search_fields=[],
+        fields=[
+            _f("activity_id", "Activity", "reference", required=True, reference_entity="activity"),
+            _f("student_id", "Student", "reference", required=True, reference_entity="student"),
+            _f("registration_date", "Date", "date"),
+            _f("registration_status", "Status", "select", options_master="registration_status"),
+        ],
+    ),
+    # ----------------------------------------------------------------- Meal & Cafeteria
+    EntitySpec(
+        operations.MealPlan, "meal-plan", "Meal Plan", "meal_cafeteria",
+        kind="master", icon="check-square", search_fields=["name", "code"],
+        fields=[
+            _f("name", "Name", required=True),
+            _f("code", "Code", required=True),
+            _f("meal_type", "Meal Type", "select", options_master="meal_type"),
+            _f("price", "Price", "decimal"),
+        ],
+    ),
+    EntitySpec(
+        operations.MealMenu, "meal-menu", "Meal Menu", "meal_cafeteria",
+        kind="transaction", icon="table", search_fields=["day_of_week"],
+        fields=[
+            _f("meal_plan_id", "Meal Plan", "reference", reference_entity="meal-plan"),
+            _f("day_of_week", "Day", "select", required=True, options_master="day_of_week"),
+            _f("items", "Items", "text"),
+            _f("calories", "Calories", "number"),
+        ],
+    ),
+    # ----------------------------------------------------------------- Communication
+    EntitySpec(
+        operations.Announcement, "announcement", "Announcement", "ptm_communication",
+        kind="transaction", icon="activity", search_fields=["title"],
+        fields=[
+            _f("title", "Title", required=True),
+            _f("body", "Body", "text", list_visible=False),
+            _f("audience", "Audience", "select", options_master="audience"),
+            _f("channel", "Channel", "select", options_master="comm_channel"),
+            _f("publish_date", "Publish Date", "date"),
+            _f("announcement_status", "Status", "select", options_master="announcement_status"),
+        ],
+    ),
+    # ----------------------------------------------------------------- Public Website / CMS
+    EntitySpec(
+        operations.CmsPage, "cms-page", "CMS Page", "public_website_cms",
+        kind="transaction", icon="book", search_fields=["title", "slug"],
+        fields=[
+            _f("title", "Title", required=True),
+            _f("slug", "Slug", required=True),
+            _f("page_type", "Type", "select", options_master="cms_page_type"),
+            _f("body", "Body", "text", list_visible=False),
+            _f("is_published", "Published", "bool"),
+            _f("publish_date", "Publish Date", "date"),
+        ],
+    ),
+    EntitySpec(
+        operations.Banner, "banner", "Banner", "public_website_cms",
+        kind="master", icon="grid", search_fields=["title"],
+        fields=[
+            _f("title", "Title", required=True),
+            _f("image_url", "Image URL"),
+            _f("link_url", "Link URL"),
+            _f("sort_order", "Order", "number"),
+            _f("is_active", "Active", "bool"),
         ],
     ),
 ]

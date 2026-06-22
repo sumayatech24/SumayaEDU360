@@ -20,7 +20,10 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://eduos:eduos@localhost:5432/eduos"
 
     # Stored as a comma-separated string (env-friendly); use ``cors_origins`` for the list.
-    BACKEND_CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
+    BACKEND_CORS_ORIGINS: str = (
+        "http://localhost:5173,http://127.0.0.1:5173,"
+        "http://localhost:3000,http://127.0.0.1:3000"
+    )
 
     SEED_ADMIN_EMAIL: str = "admin@sumaya.edu"
     SEED_ADMIN_PASSWORD: str = "Admin@123"

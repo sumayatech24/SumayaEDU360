@@ -38,7 +38,30 @@ from app.models.meta import (  # noqa: F401
     Notification,
     Setting,
 )
+from app.models.academics_ops import (  # noqa: F401
+    Homework,
+    HomeworkSubmission,
+    LessonPlan,
+    TimetablePeriod,
+)
+from app.models.finance import (  # noqa: F401
+    Expense,
+    LedgerAccount,
+    PurchaseOrder,
+    Vendor,
+)
 from app.models.hostel import HostelAllocation, HostelBlock, HostelRoom  # noqa: F401
+from app.models.operations import (  # noqa: F401
+    Activity,
+    ActivityRegistration,
+    Announcement,
+    Banner,
+    CmsPage,
+    InventoryItem,
+    MealMenu,
+    MealPlan,
+    StockMovement,
+)
 from app.models.hr import LeaveRequest, LeaveType, Payroll  # noqa: F401
 from app.models.library import BookIssue, LibraryBook  # noqa: F401
 from app.models.people import (  # noqa: F401
@@ -69,4 +92,8 @@ __all__ = [
     "TransportRoute", "Vehicle", "RouteStop", "StudentTransportAssignment",
     "HostelBlock", "HostelRoom", "HostelAllocation",
     "LeaveType", "LeaveRequest", "Payroll",
+    "Homework", "HomeworkSubmission", "TimetablePeriod", "LessonPlan",
+    "LedgerAccount", "Vendor", "Expense", "PurchaseOrder",
+    "InventoryItem", "StockMovement", "Activity", "ActivityRegistration",
+    "MealPlan", "MealMenu", "Announcement", "CmsPage", "Banner",
 ]

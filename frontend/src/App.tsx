@@ -7,6 +7,7 @@ import { Admissions } from "./pages/Admissions";
 import { Attendance } from "./pages/Attendance";
 import { Audit } from "./pages/Audit";
 import { Dashboard } from "./pages/Dashboard";
+import { Exams } from "./pages/Exams";
 import { Fees } from "./pages/Fees";
 import { Hostel } from "./pages/Hostel";
 import { HR } from "./pages/HR";
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="/academic" element={<Academic />} />
         <Route path="/admissions" element={<Admissions />} />
         <Route path="/attendance" element={<Attendance />} />
+        <Route path="/exams" element={<Exams />} />
         <Route path="/fees" element={<Fees />} />
         <Route path="/library" element={<Library />} />
         <Route path="/hostel" element={<Hostel />} />

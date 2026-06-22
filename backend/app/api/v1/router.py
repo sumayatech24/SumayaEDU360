@@ -17,6 +17,7 @@ from app.api.v1 import (
     reports,
     users,
     workflows,
+    workflows2,
 )
 
 api_router = APIRouter()
@@ -32,4 +33,5 @@ api_router.include_router(attendance.router)
 api_router.include_router(exams.router)           # marks / report card
 api_router.include_router(promotion.router)
 api_router.include_router(workflows.router)       # lifecycle: admissions, library, hostel, hr
+api_router.include_router(workflows2.router)      # lifecycle: finance, inventory, homework, activities
 api_router.include_router(reports.router)

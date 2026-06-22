@@ -491,6 +491,28 @@ async def seed() -> None:
 
         await db.flush()
 
+        # Prune placeholder/duplicate metadata entities created from the spec's
+        # (column-shifted) rows so module tabs only show meaningful entities:
+        #  * "*Config" placeholder rows
+        #  * metadata entities that duplicate a typed entity (e.g. "LibraryBook"
+        #    vs typed "Library Book") — often misfiled under the wrong module
+        all_ents = (
+            await db.execute(
+                select(EntityDef).where(EntityDef.tenant_id == tid, EntityDef.is_deleted.is_(False))
+            )
+        ).scalars().all()
+
+        def _norm(s: str) -> str:
+            return "".join(ch for ch in s.lower() if ch.isalnum())
+
+        typed_names = {_norm(e.name) for e in all_ents if e.is_typed}
+        for e in all_ents:
+            if e.is_typed:
+                continue
+            if e.name.endswith("Config") or _norm(e.name) in typed_names:
+                e.is_deleted = True
+        await db.flush()
+
         # ---------------------------------------------------------------- catch-all & cleanup
         # A module only needs a generic "<Module> Record" entity when it has NO real
         # (typed or metadata) entity. Drop stale catch-alls for modules that now have

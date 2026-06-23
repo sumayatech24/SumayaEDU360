@@ -23,6 +23,7 @@ import { Login } from "./pages/Login";
 import { Masters } from "./pages/Masters";
 import { Meals } from "./pages/Meals";
 import { ModulePage } from "./pages/ModulePage";
+import { ParentPortal } from "./pages/ParentPortal";
 import { Promotion } from "./pages/Promotion";
 import { QuestionBank } from "./pages/QuestionBank";
 import { Reports } from "./pages/Reports";
@@ -69,6 +70,7 @@ export default function App() {
         <Route path="/curriculum" element={<Curriculum />} />
         <Route path="/cms" element={<CMS />} />
         <Route path="/knowledge" element={<KnowledgeBase />} />
+        <Route path="/parent-portal" element={<ParentPortal />} />
         <Route path="/question-bank" element={<QuestionBank />} />
         <Route path="/promotion" element={<Promotion />} />
         <Route path="/reports" element={<Reports />} />

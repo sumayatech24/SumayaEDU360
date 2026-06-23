@@ -263,6 +263,7 @@ CORE_NAV = [
     ("Dashboard", "grid", "/dashboard", None, None, 1),
     ("Admissions", "user-plus", "/admissions", "admissions_crm", "admissions_crm:read", 10),
     ("Students", "users", "/students", "student_information_system", "student_information_system:read", 11),
+    ("Parent Portal", "users", "/parent-portal", "parent_guardian_portal", "parent_guardian_portal:read", 11),
     ("Academic Setup", "book", "/academic", "academic_configuration", "academic_configuration:read", 12),
     ("Employees / HR", "briefcase", "/employees", "employee_hrms", "employee_hrms:read", 13),
     ("Fees & Billing", "credit-card", "/fees", "fees_billing", "fees_billing:read", 14),

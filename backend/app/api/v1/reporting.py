@@ -29,7 +29,7 @@ from app.models.hostel import HostelBlock, HostelRoom
 from app.models.hr import LeaveRequest, Payroll
 from app.models.library import BookIssue, LibraryBook
 from app.models.operations import Activity, ActivityRegistration, Announcement, InventoryItem
-from app.models.people import Employee, Student
+from app.models.people import Employee, Guardian, Student
 from app.models.transport import StudentTransportAssignment, TransportRoute
 
 router = APIRouter(prefix="/reports", tags=["Reports & Dashboards"])
@@ -307,6 +307,70 @@ async def catalog(user: CurrentUser = Depends(get_current_user)):
         {"key": k, "name": r["name"], "module": r["module"], "filters": r.get("filters", [])}
         for k, r in REPORTS.items()
     ]
+
+
+@router.get("/student-360/{student_id}")
+async def student_360(
+    student_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Consolidated parent-portal view for one student across modules."""
+    import uuid as _uuid
+
+    student = await db.get(Student, _uuid.UUID(student_id))
+    if not student or student.tenant_id != user.tenant_id or student.is_deleted:
+        raise HTTPException(404, "Student not found")
+    tid = user.tenant_id
+    grades = await _name_map(db, Grade, tid, lambda g: g.name)
+    sections = await _name_map(db, Section, tid, lambda s: s.name)
+    subjects = await _name_map(db, Subject, tid, lambda s: s.name)
+    exams = await _name_map(db, Exam, tid, lambda e: e.name)
+
+    invoices = (
+        await db.execute(select(Invoice).where(Invoice.tenant_id == tid, Invoice.student_id == student.id,
+                                                Invoice.is_deleted.is_(False)))
+    ).scalars().all()
+    billed = sum((i.net_amount or Decimal(0)) for i in invoices)
+    paid = sum((i.paid_amount or Decimal(0)) for i in invoices)
+
+    att = (
+        await db.execute(select(Attendance.state, func.count()).where(
+            Attendance.tenant_id == tid, Attendance.student_id == student.id,
+            Attendance.is_deleted.is_(False)).group_by(Attendance.state))
+    ).all()
+    att_summary = {s: c for s, c in att}
+
+    marks = (
+        await db.execute(select(Marks).where(Marks.tenant_id == tid, Marks.student_id == student.id,
+                                             Marks.is_deleted.is_(False)))
+    ).scalars().all()
+    guardians = (
+        await db.execute(select(Guardian).where(Guardian.tenant_id == tid, Guardian.student_id == student.id,
+                                                Guardian.is_deleted.is_(False)))
+    ).scalars().all()
+
+    return {
+        "student": {
+            "id": str(student.id), "admission_no": student.admission_no,
+            "name": f"{student.first_name} {student.last_name or ''}".strip(),
+            "grade": grades.get(student.grade_id, "—"), "section": sections.get(student.section_id, "—"),
+            "gender": student.gender, "status": student.enrollment_status,
+            "phone": student.phone, "email": student.email,
+        },
+        "guardians": [
+            {"name": g.full_name, "relation": g.relation, "phone": g.phone, "email": g.email}
+            for g in guardians
+        ],
+        "fees": {"billed": _s(billed), "paid": _s(paid), "balance": _s(billed - paid),
+                 "invoices": len(invoices)},
+        "attendance": att_summary,
+        "marks": [
+            {"exam": exams.get(m.exam_id, "—"), "subject": subjects.get(m.subject_id, "—"),
+             "marks": _s(m.marks_obtained), "max": _s(m.max_marks), "grade": m.grade_letter}
+            for m in marks
+        ],
+    }
 
 
 @router.get("/run/{key}")

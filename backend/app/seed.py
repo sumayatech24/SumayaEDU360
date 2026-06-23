@@ -287,6 +287,7 @@ CORE_NAV = [
     ("Website & CMS", "grid", "/cms", "public_website_cms", "public_website_cms:read", 32),
     ("Reports", "activity", "/reports", "dashboards_analytics", "dashboards_analytics:read", 80),
     ("Masters", "sliders", "/masters", "academic_configuration", "academic_configuration:read", 90),
+    ("Integrations", "cube", "/integrations", "integrations", "integrations:read", 93),
     ("Users & Roles", "shield", "/users", "security_compliance", "security_compliance:read", 91),
     ("Audit Log", "activity", "/audit", "security_compliance", "security_compliance:read", 92),
 ]

@@ -17,6 +17,7 @@ import { Finance } from "./pages/Finance";
 import { HomeworkPage } from "./pages/HomeworkPage";
 import { Hostel } from "./pages/Hostel";
 import { HR } from "./pages/HR";
+import { Integrations } from "./pages/Integrations";
 import { KnowledgeBase } from "./pages/KnowledgeBase";
 import { Library } from "./pages/Library";
 import { Login } from "./pages/Login";
@@ -74,6 +75,7 @@ export default function App() {
         <Route path="/question-bank" element={<QuestionBank />} />
         <Route path="/promotion" element={<Promotion />} />
         <Route path="/reports" element={<Reports />} />
+        <Route path="/integrations" element={<Integrations />} />
         <Route path="/masters" element={<Masters />} />
         <Route path="/users" element={<Users />} />
         <Route path="/audit" element={<Audit />} />

@@ -12,7 +12,11 @@ from app.core.database import get_db
 from app.core.deps import CurrentUser, get_current_user
 from app.models.attendance import Attendance
 from app.models.fees import Invoice, Payment
+from app.models.finance import Expense
+from app.models.hr import LeaveRequest
+from app.models.library import BookIssue
 from app.models.meta import AuditLog, Module
+from app.models.operations import Activity, InventoryItem
 from app.models.people import Employee, Student
 
 
@@ -49,12 +53,38 @@ async def dashboard(db: AsyncSession = Depends(get_db), user: CurrentUser = Depe
             Attendance.state == "present", Attendance.is_deleted.is_(False)))
     ).scalar_one()
 
+    # Operational signals across the newer modules.
+    books_out = (
+        await db.execute(select(func.count()).select_from(BookIssue).where(
+            BookIssue.tenant_id == tid, BookIssue.issue_status != "returned", BookIssue.is_deleted.is_(False)))
+    ).scalar_one()
+    pending_leave = (
+        await db.execute(select(func.count()).select_from(LeaveRequest).where(
+            LeaveRequest.tenant_id == tid, LeaveRequest.request_status == "applied",
+            LeaveRequest.is_deleted.is_(False)))
+    ).scalar_one()
+    pending_expenses = (
+        await db.execute(select(func.count()).select_from(Expense).where(
+            Expense.tenant_id == tid, Expense.approval_status == "pending", Expense.is_deleted.is_(False)))
+    ).scalar_one()
+    low_stock = (
+        await db.execute(select(func.count()).select_from(InventoryItem).where(
+            InventoryItem.tenant_id == tid, InventoryItem.is_deleted.is_(False),
+            InventoryItem.quantity_on_hand <= InventoryItem.reorder_level))
+    ).scalar_one()
+    activities = await _count(db, Activity, tid)
+
     return {
         "cards": [
             {"key": "students", "label": "Students", "value": students, "icon": "users"},
             {"key": "employees", "label": "Employees", "value": employees, "icon": "briefcase"},
             {"key": "modules", "label": "Active Modules", "value": modules, "icon": "grid"},
             {"key": "present_today", "label": "Present Today", "value": today_present, "icon": "check"},
+            {"key": "books_out", "label": "Books Issued", "value": books_out, "icon": "book"},
+            {"key": "pending_leave", "label": "Pending Leave", "value": pending_leave, "icon": "edit"},
+            {"key": "pending_expenses", "label": "Expenses to Approve", "value": pending_expenses, "icon": "credit-card"},
+            {"key": "low_stock", "label": "Low-Stock Items", "value": low_stock, "icon": "table"},
+            {"key": "activities", "label": "Activities", "value": activities, "icon": "trending-up"},
         ],
         "finance": {
             "total_billed": str(total_billed or Decimal(0)),

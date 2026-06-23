@@ -3,12 +3,16 @@ import { Layout } from "./components/Layout";
 import { ResourcePage } from "./components/ResourcePage";
 import { useAuth } from "./lib/auth";
 import { Academic } from "./pages/Academic";
+import { ActivitiesPage } from "./pages/ActivitiesPage";
 import { Admissions } from "./pages/Admissions";
 import { Attendance } from "./pages/Attendance";
 import { Audit } from "./pages/Audit";
+import { Communication } from "./pages/Communication";
 import { Dashboard } from "./pages/Dashboard";
 import { Exams } from "./pages/Exams";
 import { Fees } from "./pages/Fees";
+import { Finance } from "./pages/Finance";
+import { HomeworkPage } from "./pages/HomeworkPage";
 import { Hostel } from "./pages/Hostel";
 import { HR } from "./pages/HR";
 import { Library } from "./pages/Library";
@@ -16,6 +20,7 @@ import { Login } from "./pages/Login";
 import { Masters } from "./pages/Masters";
 import { ModulePage } from "./pages/ModulePage";
 import { Promotion } from "./pages/Promotion";
+import { Store } from "./pages/Store";
 import { Users } from "./pages/Users";
 
 function Protected({ children }: { children: React.ReactNode }) {
@@ -45,6 +50,11 @@ export default function App() {
         <Route path="/library" element={<Library />} />
         <Route path="/hostel" element={<Hostel />} />
         <Route path="/hr" element={<HR />} />
+        <Route path="/finance" element={<Finance />} />
+        <Route path="/store" element={<Store />} />
+        <Route path="/homework" element={<HomeworkPage />} />
+        <Route path="/activities" element={<ActivitiesPage />} />
+        <Route path="/communication" element={<Communication />} />
         <Route path="/promotion" element={<Promotion />} />
         <Route path="/masters" element={<Masters />} />
         <Route path="/users" element={<Users />} />

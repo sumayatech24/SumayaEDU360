@@ -7,13 +7,24 @@ import type { EntityDef, Page } from "../lib/types";
 import { EntityForm } from "./EntityForm";
 import { Modal } from "./Modal";
 
+export interface RowAction {
+  label: string;
+  tone?: "primary" | "danger" | "ghost";
+  /** Only show the button when this returns true for the row's data. */
+  show?: (row: Record<string, any>) => boolean;
+  /** Perform the workflow action; throw to surface an error. */
+  run: (row: Record<string, any>, id: string) => Promise<void>;
+}
+
 interface Props {
   entitySlug: string;
   permPrefix?: string; // module slug for RBAC gating of buttons
   title?: string;
+  hideCreate?: boolean;
+  rowActions?: RowAction[];
 }
 
-export function ResourcePage({ entitySlug, permPrefix, title }: Props) {
+export function ResourcePage({ entitySlug, permPrefix, title, hideCreate, rowActions }: Props) {
   const qc = useQueryClient();
   const { can } = useAuth();
   const [page, setPage] = useState(1);
@@ -72,7 +83,17 @@ export function ResourcePage({ entitySlug, permPrefix, title }: Props) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["resource", entitySlug] }),
   });
 
-  const canCreate = !permPrefix || can(`${permPrefix}:create`);
+  const actionMutation = useMutation({
+    mutationFn: async ({ action, row, id }: { action: RowAction; row: Record<string, any>; id: string }) =>
+      action.run(row, id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["resource", entitySlug] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+    onError: (e) => alert(apiError(e)),
+  });
+
+  const canCreate = !hideCreate && (!permPrefix || can(`${permPrefix}:create`));
   const canDelete = !permPrefix || can(`${permPrefix}:delete`);
 
   return (
@@ -143,6 +164,24 @@ export function ResourcePage({ entitySlug, permPrefix, title }: Props) {
                     </td>
                   ))}
                   <td className="px-4 py-3 text-right">
+                    {rowActions
+                      ?.filter((a) => !a.show || a.show(d))
+                      .map((a) => (
+                        <button
+                          key={a.label}
+                          className={`${
+                            a.tone === "danger"
+                              ? "btn-danger"
+                              : a.tone === "ghost"
+                              ? "btn-ghost"
+                              : "btn-primary"
+                          } px-2 py-1 text-xs`}
+                          disabled={actionMutation.isPending}
+                          onClick={() => actionMutation.mutate({ action: a, row: d, id: row.id })}
+                        >
+                          {a.label}
+                        </button>
+                      ))}
                     <button
                       className="btn-ghost px-2 py-1 text-xs"
                       onClick={() => {

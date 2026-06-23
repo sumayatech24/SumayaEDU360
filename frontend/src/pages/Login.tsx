@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiError } from "../lib/api";
-import { useAuth } from "../lib/auth";
+import { PORTAL_BASE, useAuth } from "../lib/auth";
 
 export function Login() {
   const { login } = useAuth();
@@ -16,8 +16,8 @@ export function Login() {
     setLoading(true);
     setError(null);
     try {
-      await login(email, password);
-      navigate("/dashboard");
+      const ctx = await login(email, password);
+      navigate(PORTAL_BASE[ctx.portal] ?? "/");
     } catch (err) {
       setError(apiError(err));
     } finally {
@@ -58,9 +58,32 @@ export function Login() {
           </button>
         </form>
 
-        <p className="mt-4 text-center text-xs text-slate-400">
-          Demo admin seeded from the database · admin@sumaya.edu / Admin@123
-        </p>
+        <div className="mt-5 border-t border-slate-100 pt-3">
+          <p className="mb-2 text-center text-[11px] font-medium uppercase tracking-wide text-slate-400">
+            Demo logins — one per portal
+          </p>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            {[
+              ["Admin", "admin@sumaya.edu", "Admin@123"],
+              ["Teacher", "teacher@sumaya.edu", "Teacher@123"],
+              ["Student", "student@sumaya.edu", "Student@123"],
+              ["Parent", "parent@sumaya.edu", "Parent@123"],
+            ].map(([role, em, pw]) => (
+              <button
+                key={role}
+                type="button"
+                onClick={() => {
+                  setEmail(em);
+                  setPassword(pw);
+                }}
+                className="rounded-lg border border-slate-200 px-2 py-1.5 text-left hover:border-brand-400 hover:bg-brand-50"
+              >
+                <div className="font-medium text-slate-700">{role}</div>
+                <div className="truncate text-[10px] text-slate-400">{em}</div>
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

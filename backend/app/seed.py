@@ -17,7 +17,7 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
-from datetime import date
+from datetime import date, time
 from decimal import Decimal
 from pathlib import Path
 
@@ -37,11 +37,15 @@ from app.models import (
     FeePlan,
     FieldDef,
     Grade,
+    Homework,
+    HomeworkSubmission,
     HostelBlock,
     HostelRoom,
     LeaveType,
     LibraryBook,
+    Activity,
     TransportRoute,
+    TimetablePeriod,
     Vehicle,
     Institution,
     Invoice,
@@ -750,6 +754,58 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
             defaults={"full_name": "Rakesh Gupta", "phone": "9810000001",
                       "email": "rakesh@example.com", "is_primary": True},
         )
+        grade_id = first_student.grade_id
+        section_id = first_student.section_id
+        for j, sub in enumerate(subs[:3], start=1):
+            await get_or_create(
+                db, TimetablePeriod, tenant_id=tid, grade_id=grade_id, section_id=section_id,
+                day_of_week=["Monday", "Tuesday", "Wednesday"][j - 1], period_no=j,
+                defaults={
+                    "subject_id": sub.id,
+                    "start_time": time(8 + j, 0),
+                    "end_time": time(8 + j, 45),
+                    "room": f"G1-{j}",
+                },
+            )
+        for j, sub in enumerate(subs[:2], start=1):
+            hw, _ = await get_or_create(
+                db, Homework, tenant_id=tid, title=f"{sub.name} practice set {j}",
+                defaults={
+                    "grade_id": grade_id,
+                    "section_id": section_id,
+                    "subject_id": sub.id,
+                    "assigned_date": date.today(),
+                    "due_date": date(2026, 7, 15 + j),
+                    "description": f"Complete the workbook exercise and submit your answer notes for {sub.name}.",
+                    "max_marks": Decimal("10"),
+                    "homework_status": "assigned",
+                },
+            )
+            if j == 1:
+                await get_or_create(
+                    db, HomeworkSubmission, tenant_id=tid, homework_id=hw.id, student_id=first_student.id,
+                    defaults={
+                        "submitted_date": date.today(),
+                        "content": "Completed and uploaded through the student portal.",
+                        "submission_status": "submitted",
+                    },
+                )
+        for code, name, kind, fee, cap in [
+            ("ACT-ROB", "Robotics Club", "club", Decimal("2500"), 30),
+            ("ACT-FOOT", "Inter-house Football", "sport", Decimal("0"), 22),
+            ("ACT-MUN", "Model United Nations", "competition", Decimal("1500"), 40),
+        ]:
+            await get_or_create(
+                db, Activity, tenant_id=tid, code=code,
+                defaults={
+                    "name": name,
+                    "activity_type": kind,
+                    "coordinator": "Rahul Verma",
+                    "start_date": date(2026, 8, 1),
+                    "fee": fee,
+                    "capacity": cap,
+                },
+            )
         if exam:
             for j, sub in enumerate(subs):
                 await get_or_create(

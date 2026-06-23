@@ -15,7 +15,7 @@ Every tier saves to PostgreSQL with tenant isolation, RBAC and audit.
 | M001 | Public Website & CMS | **Workflow** | Bespoke screen: pages (Publish/Unpublish) + banners |
 | M002 | Admissions CRM | **Workflow** | Pipeline board, stage transitions, convert-to-student |
 | M003 | Student Information System | **Workflow** | Students typed CRUD + promotion lifecycle |
-| M004 | Parent & Guardian Portal | **Workflow** | Student-360 view: profile, fees, attendance, results, guardians |
+| M004 | Parent & Guardian Portal | **Workflow** | Student-360 view plus self-scoped homework, timetable and activities |
 | M005 | Teacher Management | Typed CRUD | via Employees; dedicated teacher screen TBD |
 | M006 | Employee HRMS | **Workflow** | Employees + leave apply/approve + payroll run |
 | M007 | Academic Configuration | Typed CRUD | Years, programs, grades, sections, subjects |
@@ -79,3 +79,7 @@ Every tier saves to PostgreSQL with tenant isolation, RBAC and audit.
   Knowledge/Digital Library, CMS (publish), **Parent Portal (Student-360)** and **Integrations**.
 - Net: ~27 of 30 modules now ship a dedicated screen; remaining (AI Copilots, Mobile,
   Administration generic) are future-phase by design.
+- Added separate student, parent and teacher portal shells selected after login, backed by
+  `/portal/context`; student/parent users now see profile, fees, attendance, marks,
+  guardians, announcements, homework submission, timetable and activity registration
+  without entering the admin ERP. Teacher login gets a role-focused dashboard.

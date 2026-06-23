@@ -18,11 +18,12 @@ logger = logging.getLogger("eduos")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Bootstrap convenience: ensure tables exist on startup.
-    try:
-        await init_models()
-        logger.info("Database tables ensured.")
-    except Exception as exc:  # pragma: no cover - startup diagnostics
-        logger.warning("Could not initialise tables on startup: %s", exc)
+    if settings.INIT_DB_ON_STARTUP:
+        try:
+            await init_models()
+            logger.info("Database tables ensured.")
+        except Exception as exc:  # pragma: no cover - startup diagnostics
+            logger.warning("Could not initialise tables on startup: %s", exc)
     yield
 
 

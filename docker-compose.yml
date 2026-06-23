@@ -26,6 +26,7 @@ services:
       BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost:5173}
       SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@sumaya.edu}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-Admin@123}
+      INIT_DB_ON_STARTUP: "false"
     ports:
       - "8000:8000"
     # Seed first (idempotent), then serve.
@@ -36,7 +37,7 @@ services:
     depends_on:
       - backend
     environment:
-      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+      VITE_API_BASE_URL: ${FRONTEND_API_BASE_URL:-http://localhost:8000}
     ports:
       - "5173:5173"
 

@@ -1,7 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { ResourcePage } from "./components/ResourcePage";
-import { useAuth } from "./lib/auth";
+import { PORTAL_BASE, useAuth } from "./lib/auth";
 import { Academic } from "./pages/Academic";
 import { ActivitiesPage } from "./pages/ActivitiesPage";
 import { Admissions } from "./pages/Admissions";
@@ -24,7 +24,8 @@ import { Login } from "./pages/Login";
 import { Masters } from "./pages/Masters";
 import { Meals } from "./pages/Meals";
 import { ModulePage } from "./pages/ModulePage";
-import { ParentPortal } from "./pages/ParentPortal";
+import { ParentPortal as ParentPortalAdmin } from "./pages/ParentPortal";
+import { ParentPortal, StudentPortal, TeacherPortal } from "./pages/Portals";
 import { Promotion } from "./pages/Promotion";
 import { QuestionBank } from "./pages/QuestionBank";
 import { Reports } from "./pages/Reports";
@@ -33,24 +34,20 @@ import { Timetable } from "./pages/Timetable";
 import { Transport } from "./pages/Transport";
 import { Users } from "./pages/Users";
 
-function Protected({ children }: { children: React.ReactNode }) {
-  const { me, loading } = useAuth();
+/** Auth + portal guard: redirects users to their own portal's base URL. */
+function Guard({ need, children }: { need: string; children: React.ReactNode }) {
+  const { me, portal, loading } = useAuth();
   if (loading) return <div className="flex h-full items-center justify-center text-slate-400">Loading…</div>;
   if (!me) return <Navigate to="/login" replace />;
+  if (portal && portal.portal !== need) return <Navigate to={PORTAL_BASE[portal.portal] ?? "/"} replace />;
   return <>{children}</>;
 }
 
-export default function App() {
+/** The full admin/staff ERP (RBAC-filtered navigation). */
+function AdminApp() {
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route
-        element={
-          <Protected>
-            <Layout />
-          </Protected>
-        }
-      >
+      <Route element={<Layout />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/academic" element={<Academic />} />
         <Route path="/admissions" element={<Admissions />} />
@@ -71,7 +68,7 @@ export default function App() {
         <Route path="/curriculum" element={<Curriculum />} />
         <Route path="/cms" element={<CMS />} />
         <Route path="/knowledge" element={<KnowledgeBase />} />
-        <Route path="/parent-portal" element={<ParentPortal />} />
+        <Route path="/parent-portal" element={<ParentPortalAdmin />} />
         <Route path="/question-bank" element={<QuestionBank />} />
         <Route path="/promotion" element={<Promotion />} />
         <Route path="/reports" element={<Reports />} />
@@ -89,8 +86,20 @@ export default function App() {
         />
         <Route path="/m/:slug" element={<ModulePage />} />
         <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Route>
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+    </Routes>
+  );
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="/student/*" element={<Guard need="student"><StudentPortal /></Guard>} />
+      <Route path="/parent/*" element={<Guard need="parent"><ParentPortal /></Guard>} />
+      <Route path="/teacher/*" element={<Guard need="teacher"><TeacherPortal /></Guard>} />
+      <Route path="/*" element={<Guard need="admin"><AdminApp /></Guard>} />
     </Routes>
   );
 }

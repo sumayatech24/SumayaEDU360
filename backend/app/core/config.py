@@ -18,6 +18,7 @@ class Settings(BaseSettings):
 
     # Default points at the docker postgres exposed on localhost for local dev.
     DATABASE_URL: str = "postgresql+asyncpg://eduos:eduos@localhost:5432/eduos"
+    INIT_DB_ON_STARTUP: bool = True
 
     # Stored as a comma-separated string (env-friendly); use ``cors_origins`` for the list.
     BACKEND_CORS_ORIGINS: str = (

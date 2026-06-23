@@ -20,6 +20,7 @@ import { Login } from "./pages/Login";
 import { Masters } from "./pages/Masters";
 import { ModulePage } from "./pages/ModulePage";
 import { Promotion } from "./pages/Promotion";
+import { Reports } from "./pages/Reports";
 import { Store } from "./pages/Store";
 import { Users } from "./pages/Users";
 
@@ -56,6 +57,7 @@ export default function App() {
         <Route path="/activities" element={<ActivitiesPage />} />
         <Route path="/communication" element={<Communication />} />
         <Route path="/promotion" element={<Promotion />} />
+        <Route path="/reports" element={<Reports />} />
         <Route path="/masters" element={<Masters />} />
         <Route path="/users" element={<Users />} />
         <Route path="/audit" element={<Audit />} />

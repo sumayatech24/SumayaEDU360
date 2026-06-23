@@ -277,6 +277,7 @@ CORE_NAV = [
     ("Finance", "credit-card", "/finance", "finance_accounting", "finance_accounting:read", 23),
     ("Store / Inventory", "table", "/store", "finance_accounting", "finance_accounting:read", 24),
     ("Communication", "activity", "/communication", "ptm_communication", "ptm_communication:read", 25),
+    ("Reports", "activity", "/reports", "dashboards_analytics", "dashboards_analytics:read", 80),
     ("Masters", "sliders", "/masters", "academic_configuration", "academic_configuration:read", 90),
     ("Users & Roles", "shield", "/users", "security_compliance", "security_compliance:read", 91),
     ("Audit Log", "activity", "/audit", "security_compliance", "security_compliance:read", 92),

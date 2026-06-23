@@ -14,6 +14,7 @@ from app.api.v1 import (
     masters,
     meta,
     promotion,
+    reporting,
     reports,
     users,
     workflows,
@@ -35,3 +36,4 @@ api_router.include_router(promotion.router)
 api_router.include_router(workflows.router)       # lifecycle: admissions, library, hostel, hr
 api_router.include_router(workflows2.router)      # lifecycle: finance, inventory, homework, activities
 api_router.include_router(reports.router)
+api_router.include_router(reporting.router)       # report catalog + generic runner

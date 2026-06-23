@@ -30,6 +30,7 @@ import { Promotion } from "./pages/Promotion";
 import { QuestionBank } from "./pages/QuestionBank";
 import { Reports } from "./pages/Reports";
 import { Store } from "./pages/Store";
+import { StudentProfile } from "./pages/StudentProfile";
 import { Timetable } from "./pages/Timetable";
 import { Transport } from "./pages/Transport";
 import { Users } from "./pages/Users";
@@ -78,8 +79,16 @@ function AdminApp() {
         <Route path="/audit" element={<Audit />} />
         <Route
           path="/students"
-          element={<ResourcePage entitySlug="student" permPrefix="student_information_system" title="Students" />}
+          element={
+            <ResourcePage
+              entitySlug="student"
+              permPrefix="student_information_system"
+              title="Students"
+              viewPath={(id) => `/students/${id}`}
+            />
+          }
         />
+        <Route path="/students/:id" element={<StudentProfile />} />
         <Route
           path="/employees"
           element={<ResourcePage entitySlug="employee" permPrefix="employee_hrms" title="Employees / HR" />}

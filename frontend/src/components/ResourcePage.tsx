@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { api, apiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { endpointFor } from "../lib/resources";
@@ -22,9 +23,11 @@ interface Props {
   title?: string;
   hideCreate?: boolean;
   rowActions?: RowAction[];
+  /** Render a "View" link per row to this path. */
+  viewPath?: (id: string) => string;
 }
 
-export function ResourcePage({ entitySlug, permPrefix, title, hideCreate, rowActions }: Props) {
+export function ResourcePage({ entitySlug, permPrefix, title, hideCreate, rowActions, viewPath }: Props) {
   const qc = useQueryClient();
   const { can } = useAuth();
   const [page, setPage] = useState(1);
@@ -164,6 +167,11 @@ export function ResourcePage({ entitySlug, permPrefix, title, hideCreate, rowAct
                     </td>
                   ))}
                   <td className="px-4 py-3 text-right">
+                    {viewPath && (
+                      <Link to={viewPath(row.id)} className="btn-ghost px-2 py-1 text-xs text-brand-600">
+                        Profile
+                      </Link>
+                    )}
                     {rowActions
                       ?.filter((a) => !a.show || a.show(d))
                       .map((a) => (

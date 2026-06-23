@@ -30,6 +30,12 @@ from app.models.hr import LeaveRequest, Payroll
 from app.models.library import BookIssue, LibraryBook
 from app.models.operations import Activity, ActivityRegistration, Announcement, InventoryItem
 from app.models.people import Employee, Guardian, Student
+from app.models.student_records import (
+    Achievement,
+    DisciplinaryAction,
+    StudentAcademicHistory,
+    StudentRemark,
+)
 from app.models.transport import StudentTransportAssignment, TransportRoute
 
 router = APIRouter(prefix="/reports", tags=["Reports & Dashboards"])
@@ -350,25 +356,122 @@ async def student_360(
                                                 Guardian.is_deleted.is_(False)))
     ).scalars().all()
 
+    history = (
+        await db.execute(select(StudentAcademicHistory).where(
+            StudentAcademicHistory.tenant_id == tid, StudentAcademicHistory.student_id == student.id,
+            StudentAcademicHistory.is_deleted.is_(False)).order_by(StudentAcademicHistory.academic_year))
+    ).scalars().all()
+    achievements = (
+        await db.execute(select(Achievement).where(
+            Achievement.tenant_id == tid, Achievement.student_id == student.id,
+            Achievement.is_deleted.is_(False)).order_by(Achievement.achieved_on.desc()))
+    ).scalars().all()
+    discipline = (
+        await db.execute(select(DisciplinaryAction).where(
+            DisciplinaryAction.tenant_id == tid, DisciplinaryAction.student_id == student.id,
+            DisciplinaryAction.is_deleted.is_(False)).order_by(DisciplinaryAction.incident_date.desc()))
+    ).scalars().all()
+    remarks = (
+        await db.execute(select(StudentRemark).where(
+            StudentRemark.tenant_id == tid, StudentRemark.student_id == student.id,
+            StudentRemark.is_deleted.is_(False)).order_by(StudentRemark.remarked_on.desc()))
+    ).scalars().all()
+
+    # Activities the student is enrolled in
+    activity_names = await _name_map(db, Activity, tid, lambda a: a.name)
+    regs = (
+        await db.execute(select(ActivityRegistration).where(
+            ActivityRegistration.tenant_id == tid, ActivityRegistration.student_id == student.id,
+            ActivityRegistration.is_deleted.is_(False)))
+    ).scalars().all()
+
+    # Payments (for receipts) + per-invoice rows
+    payments = (
+        await db.execute(select(Payment).where(Payment.tenant_id == tid, Payment.student_id == student.id,
+                                               Payment.is_deleted.is_(False)).order_by(Payment.paid_at.desc()))
+    ).scalars().all()
+
+    # Teachers: class teacher of the student's section + teaching staff
+    class_teacher = None
+    section_obj = await db.get(Section, student.section_id) if student.section_id else None
+    if section_obj and section_obj.class_teacher_id:
+        ct = await db.get(Employee, section_obj.class_teacher_id)
+        if ct:
+            class_teacher = f"{ct.first_name} {ct.last_name or ''}".strip()
+    teachers = (
+        await db.execute(select(Employee).where(
+            Employee.tenant_id == tid, Employee.is_deleted.is_(False),
+            Employee.designation.ilike("%teacher%")))
+    ).scalars().all()
+
     return {
         "student": {
-            "id": str(student.id), "admission_no": student.admission_no,
+            "id": str(student.id), "admission_no": student.admission_no, "roll_no": student.roll_no,
             "name": f"{student.first_name} {student.last_name or ''}".strip(),
             "grade": grades.get(student.grade_id, "—"), "section": sections.get(student.section_id, "—"),
             "gender": student.gender, "status": student.enrollment_status,
             "phone": student.phone, "email": student.email,
+            "date_of_birth": _s(student.date_of_birth), "blood_group": student.blood_group,
+            "admission_date": _s(student.admission_date), "category": student.category,
+            "religion": student.religion, "nationality": student.nationality,
+            "mother_tongue": student.mother_tongue, "id_number": student.id_number,
+            "house": student.house, "previous_school": student.previous_school,
+            "address": student.address, "city": student.city, "state": student.state,
+            "pincode": student.pincode, "photo_url": student.photo_url,
+            "class_teacher": class_teacher,
         },
         "guardians": [
-            {"name": g.full_name, "relation": g.relation, "phone": g.phone, "email": g.email}
+            {"name": g.full_name, "relation": g.relation, "phone": g.phone, "email": g.email,
+             "occupation": g.occupation}
             for g in guardians
         ],
         "fees": {"billed": _s(billed), "paid": _s(paid), "balance": _s(billed - paid),
                  "invoices": len(invoices)},
+        "invoices": [
+            {"id": str(i.id), "invoice_no": i.invoice_no, "net": _s(i.net_amount),
+             "paid": _s(i.paid_amount), "status": i.payment_status, "due_date": _s(i.due_date)}
+            for i in invoices
+        ],
+        "payments": [
+            {"id": str(p.id), "receipt_no": p.receipt_no, "amount": _s(p.amount),
+             "method": p.method, "paid_at": _s(p.paid_at)}
+            for p in payments
+        ],
         "attendance": att_summary,
         "marks": [
             {"exam": exams.get(m.exam_id, "—"), "subject": subjects.get(m.subject_id, "—"),
              "marks": _s(m.marks_obtained), "max": _s(m.max_marks), "grade": m.grade_letter}
             for m in marks
+        ],
+        "academic_history": [
+            {"year": h.academic_year, "grade": h.grade, "section": h.section, "result": h.result,
+             "percentage": _s(h.percentage), "rank": h.rank, "remarks": h.remarks}
+            for h in history
+        ],
+        "achievements": [
+            {"title": a.title, "category": a.category, "level": a.level,
+             "date": _s(a.achieved_on), "description": a.description}
+            for a in achievements
+        ],
+        "discipline": [
+            {"date": _s(d.incident_date), "incident": d.incident_type, "severity": d.severity,
+             "description": d.description, "action": d.action_taken, "status": d.status}
+            for d in discipline
+        ],
+        "remarks": [
+            {"type": r.remark_type, "remark": r.remark, "by": r.remarked_by, "date": _s(r.remarked_on),
+             "visible_to_parent": r.is_visible_to_parent}
+            for r in remarks
+        ],
+        "activities": [
+            {"name": activity_names.get(r.activity_id, "—"), "status": r.registration_status,
+             "date": _s(r.registration_date)}
+            for r in regs
+        ],
+        "teachers": [
+            {"name": f"{t.first_name} {t.last_name or ''}".strip(), "designation": t.designation,
+             "department": t.department}
+            for t in teachers
         ],
     }
 

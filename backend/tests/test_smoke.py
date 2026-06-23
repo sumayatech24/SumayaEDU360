@@ -108,3 +108,81 @@ async def test_teacher_portal_dashboard(client):
     r = await client.get("/api/v1/portal/teacher/dashboard", headers=headers)
     assert r.status_code == 200, r.text
     assert {card["key"] for card in r.json()["cards"]} >= {"students", "homework_open", "to_grade"}
+    assert r.json()["assignments"]
+
+
+@pytest.mark.asyncio
+async def test_teacher_schedule_and_roster_are_assignment_backed(client):
+    headers = await _login(client, "teacher@sumaya.edu", "Teacher@123")
+    schedule = await client.get("/api/v1/portal/teacher/schedule", headers=headers)
+    assert schedule.status_code == 200, schedule.text
+    assert schedule.json()["classes"]
+
+    roster = await client.get("/api/v1/portal/teacher/students", headers=headers)
+    assert roster.status_code == 200, roster.text
+    first = roster.json()[0]
+    assert "phone" in first
+    assert "government_id_masked" in first
+
+
+@pytest.mark.asyncio
+async def test_marksheet_lifecycle_and_student_visibility(client):
+    admin = await _login(client, "admin@sumaya.edu", "Admin@123")
+    exams = (await client.get("/api/v1/exams", headers=admin)).json()["items"]
+    subjects = (await client.get("/api/v1/subjects", headers=admin)).json()["items"]
+    grades = (await client.get("/api/v1/grades", headers=admin)).json()["items"]
+    sections = (await client.get("/api/v1/sections", headers=admin)).json()["items"]
+    exam_id = exams[0]["id"]
+    subject_id = subjects[-1]["id"]
+    grade_id = grades[0]["id"]
+    section_id = sections[0]["id"]
+
+    sheet = await client.get(
+        f"/api/v1/exams/{exam_id}/marks-sheet",
+        params={"subject_id": subject_id, "grade_id": grade_id, "section_id": section_id},
+        headers=admin,
+    )
+    assert sheet.status_code == 200, sheet.text
+    rows = sheet.json()["rows"]
+    assert rows
+
+    save = await client.post(
+        f"/api/v1/exams/{exam_id}/marks-sheet",
+        json={
+            "subject_id": subject_id,
+            "grade_id": grade_id,
+            "section_id": section_id,
+            "entries": [
+                {
+                    "student_id": rows[0]["student_id"],
+                    "subject_id": subject_id,
+                    "marks_obtained": 86,
+                    "max_marks": 100,
+                    "is_absent": False,
+                    "remarks": "Strong performance",
+                }
+            ],
+        },
+        headers=admin,
+    )
+    assert save.status_code == 200, save.text
+    batch_id = save.json()["batch_id"]
+    assert (await client.post(f"/api/v1/exams/marks-batches/{batch_id}/submit", headers=admin)).status_code == 200
+    approve = await client.post(
+        f"/api/v1/exams/marks-batches/{batch_id}/review",
+        json={"decision": "approved"},
+        headers=admin,
+    )
+    assert approve.status_code == 200, approve.text
+    publish = await client.post(
+        f"/api/v1/exams/marks-batches/{batch_id}/review",
+        json={"decision": "published"},
+        headers=admin,
+    )
+    assert publish.status_code == 200, publish.text
+
+    student = await _login(client, "student@sumaya.edu", "Student@123")
+    dash = await client.get("/api/v1/portal/student/dashboard", headers=student)
+    assert dash.status_code == 200, dash.text
+    assert dash.json()["marks"]
+    assert dash.json()["assets"]

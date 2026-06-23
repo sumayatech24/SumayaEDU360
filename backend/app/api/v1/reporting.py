@@ -22,13 +22,13 @@ from app.models.academic import Grade, Section, Subject
 from app.models.admissions import AdmissionLead
 from app.models.attendance import Attendance
 from app.models.content import PtmMeeting
-from app.models.exams import Exam, Marks
+from app.models.exams import Exam, Marks, MarksBatch
 from app.models.fees import Invoice, Payment
 from app.models.finance import Expense, Vendor
 from app.models.hostel import HostelBlock, HostelRoom
 from app.models.hr import LeaveRequest, Payroll
 from app.models.library import BookIssue, LibraryBook
-from app.models.operations import Activity, ActivityRegistration, Announcement, InventoryItem
+from app.models.operations import Activity, ActivityRegistration, Announcement, AssetAssignment, InventoryItem
 from app.models.people import Employee, Guardian, Student
 from app.models.student_records import (
     Achievement,
@@ -51,6 +51,15 @@ def _s(v: Any) -> Any:
     if hasattr(v, "isoformat"):
         return v.isoformat()
     return v
+
+
+def _mask_identifier(value: str | None) -> str | None:
+    if not value:
+        return value
+    compact = "".join(ch for ch in value if ch.isalnum())
+    if len(compact) <= 4:
+        return "*" * len(compact)
+    return f"{'*' * (len(compact) - 4)}{compact[-4:]}"
 
 
 async def _name_map(db: AsyncSession, model, tid, fmt):
@@ -351,6 +360,12 @@ async def student_360(
         await db.execute(select(Marks).where(Marks.tenant_id == tid, Marks.student_id == student.id,
                                              Marks.is_deleted.is_(False)))
     ).scalars().all()
+    batches = (
+        await db.execute(select(MarksBatch).where(MarksBatch.tenant_id == tid, MarksBatch.is_deleted.is_(False)))
+    ).scalars().all()
+    if batches:
+        published = {(b.exam_id, b.subject_id) for b in batches if b.batch_status == "published"}
+        marks = [m for m in marks if (m.exam_id, m.subject_id) in published]
     guardians = (
         await db.execute(select(Guardian).where(Guardian.tenant_id == tid, Guardian.student_id == student.id,
                                                 Guardian.is_deleted.is_(False)))
@@ -384,6 +399,22 @@ async def student_360(
             ActivityRegistration.tenant_id == tid, ActivityRegistration.student_id == student.id,
             ActivityRegistration.is_deleted.is_(False)))
     ).scalars().all()
+    inventory_names = await _name_map(db, InventoryItem, tid, lambda i: i.name)
+    asset_rows = (
+        await db.execute(select(AssetAssignment).where(
+            AssetAssignment.tenant_id == tid,
+            AssetAssignment.student_id == student.id,
+            AssetAssignment.assignment_status == "issued",
+            AssetAssignment.is_deleted.is_(False)))
+    ).scalars().all()
+    book_names = await _name_map(db, LibraryBook, tid, lambda b: b.title)
+    book_issues = (
+        await db.execute(select(BookIssue).where(
+            BookIssue.tenant_id == tid,
+            BookIssue.student_id == student.id,
+            BookIssue.issue_status == "issued",
+            BookIssue.is_deleted.is_(False)))
+    ).scalars().all()
 
     # Payments (for receipts) + per-invoice rows
     payments = (
@@ -415,6 +446,10 @@ async def student_360(
             "admission_date": _s(student.admission_date), "category": student.category,
             "religion": student.religion, "nationality": student.nationality,
             "mother_tongue": student.mother_tongue, "id_number": student.id_number,
+            "government_id_type": student.government_id_type,
+            "government_id_masked": _mask_identifier(student.government_id_number),
+            "emergency_contact_name": student.emergency_contact_name,
+            "emergency_contact_phone": student.emergency_contact_phone,
             "house": student.house, "previous_school": student.previous_school,
             "address": student.address, "city": student.city, "state": student.state,
             "pincode": student.pincode, "photo_url": student.photo_url,
@@ -422,7 +457,9 @@ async def student_360(
         },
         "guardians": [
             {"name": g.full_name, "relation": g.relation, "phone": g.phone, "email": g.email,
-             "occupation": g.occupation}
+             "occupation": g.occupation, "address": g.address,
+             "government_id_type": g.government_id_type,
+             "government_id_masked": _mask_identifier(g.government_id_number)}
             for g in guardians
         ],
         "fees": {"billed": _s(billed), "paid": _s(paid), "balance": _s(billed - paid),
@@ -467,6 +504,15 @@ async def student_360(
             {"name": activity_names.get(r.activity_id, "—"), "status": r.registration_status,
              "date": _s(r.registration_date)}
             for r in regs
+        ],
+        "assets": [
+            {"type": "inventory", "name": inventory_names.get(a.item_id, "—"), "quantity": a.quantity,
+             "status": a.assignment_status, "issue_date": _s(a.issue_date), "due_date": _s(a.due_date)}
+            for a in asset_rows
+        ] + [
+            {"type": "library", "name": book_names.get(b.book_id, "—"), "quantity": 1,
+             "status": b.issue_status, "issue_date": _s(b.issue_date), "due_date": _s(b.due_date)}
+            for b in book_issues
         ],
         "teachers": [
             {"name": f"{t.first_name} {t.last_name or ''}".strip(), "designation": t.designation,

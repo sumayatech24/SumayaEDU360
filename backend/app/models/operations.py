@@ -35,6 +35,26 @@ class StockMovement(BaseEntity, Base):
     movement_date: Mapped[date | None] = mapped_column(Date, nullable=True)
 
 
+class AssetAssignment(BaseEntity, Base):
+    """Tracks non-library inventory issued to students, staff or locations."""
+
+    __tablename__ = "asset_assignment"
+
+    item_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("inventory_item.id"), index=True)
+    assignee_type: Mapped[str] = mapped_column(String(30), default="student", nullable=False)
+    # student / employee / location
+    student_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("student.id"), nullable=True, index=True)
+    employee_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("employee.id"), nullable=True, index=True)
+    location_name: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    quantity: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    issue_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    return_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    assignment_status: Mapped[str] = mapped_column(String(30), default="issued", nullable=False)
+    # issued / returned / lost / damaged
+    remarks: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
 # --------------------------------------------------------------------- Activities & Events
 class Activity(BaseEntity, Base):
     __tablename__ = "activity"

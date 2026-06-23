@@ -8,11 +8,44 @@ const inr = (v?: string | number) => "₹" + Number(v ?? 0).toLocaleString("en-I
 
 interface Dash {
   student: Record<string, any>;
+  persona?: string;
   guardians: { name: string; relation: string; phone?: string; email?: string }[];
-  fees: { billed: string; paid: string; balance: string; invoices: number };
+  fees: { billed?: string; paid?: string; balance: string; invoices?: number; pending?: boolean };
+  invoices?: { invoice_no: string; net: string; paid: string; status: string; due_date?: string }[];
+  payments?: { id: string; receipt_no: string; amount: string; method: string; paid_at?: string }[];
   attendance: Record<string, number>;
   marks: { exam: string; subject: string; marks: string; max: string; grade?: string }[];
+  assets?: { type: string; name: string; quantity: number; status: string; issue_date?: string; due_date?: string }[];
+  achievements?: { title: string; category?: string; level?: string; date?: string }[];
+  activities?: { name: string; status: string; date?: string }[];
+  remarks?: { type: string; remark: string; by?: string; date?: string }[];
   announcements: { title: string; body?: string; date?: string }[];
+}
+
+/** Open a printable fee receipt in a new window. */
+function printReceipt(studentName: string, p: { receipt_no: string; amount: string; method: string; paid_at?: string }) {
+  const w = window.open("", "_blank", "width=520,height=640");
+  if (!w) return;
+  w.document.write(`
+    <html><head><title>Receipt ${p.receipt_no}</title>
+    <style>body{font-family:system-ui,sans-serif;padding:32px;color:#1e293b}
+    h1{font-size:18px;margin:0}.muted{color:#64748b;font-size:12px}
+    table{width:100%;border-collapse:collapse;margin-top:20px;font-size:14px}
+    td{padding:8px 0;border-bottom:1px solid #e2e8f0}.r{text-align:right}
+    .total{font-size:20px;font-weight:700;margin-top:16px}</style></head>
+    <body>
+      <h1>SumayaEDU360 — Fee Receipt</h1>
+      <div class="muted">Receipt No: ${p.receipt_no}</div>
+      <table>
+        <tr><td>Student</td><td class="r">${studentName}</td></tr>
+        <tr><td>Date</td><td class="r">${p.paid_at ?? "—"}</td></tr>
+        <tr><td>Method</td><td class="r">${p.method.toUpperCase()}</td></tr>
+      </table>
+      <div class="total">Amount Paid: ₹${Number(p.amount).toLocaleString("en-IN")}</div>
+      <p class="muted" style="margin-top:32px">This is a computer-generated receipt.</p>
+      <script>window.print()</script>
+    </body></html>`);
+  w.document.close();
 }
 
 interface HomeworkItem {
@@ -107,12 +140,23 @@ function Student360View({ childView }: { childView?: boolean }) {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="card p-5">
           <h3 className="mb-1 text-sm font-semibold text-slate-600">Fees</h3>
-          <div className="text-3xl font-semibold text-amber-600">{inr(data.fees.balance)}</div>
-          <div className="text-xs text-slate-400">
-            balance · billed {inr(data.fees.billed)} · paid {inr(data.fees.paid)}
-          </div>
-          {childView && Number(data.fees.balance) > 0 && (
-            <div className="mt-2 text-xs font-medium text-emerald-600">Tap your school office or pay online.</div>
+          {childView ? (
+            <>
+              <div className="text-3xl font-semibold text-amber-600">{inr(data.fees.balance)}</div>
+              <div className="text-xs text-slate-400">
+                balance · billed {inr(data.fees.billed)} · paid {inr(data.fees.paid)}
+              </div>
+            </>
+          ) : data.fees.pending ? (
+            <>
+              <div className="text-2xl font-semibold text-amber-600">Payment due</div>
+              <div className="mt-1 text-xs text-slate-400">Please ask a parent/guardian to clear pending fees.</div>
+            </>
+          ) : (
+            <>
+              <div className="text-2xl font-semibold text-emerald-600">All clear ✓</div>
+              <div className="mt-1 text-xs text-slate-400">No pending fees.</div>
+            </>
           )}
         </div>
         <div className="card p-5">
@@ -157,6 +201,71 @@ function Student360View({ childView }: { childView?: boolean }) {
           </tbody>
         </table>
       </div>
+
+      <div className="card overflow-hidden">
+        <div className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-600">Assets & Library Holdings</div>
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+            <tr>
+              <th className="px-4 py-3">Type</th>
+              <th className="px-4 py-3">Item</th>
+              <th className="px-4 py-3">Qty</th>
+              <th className="px-4 py-3">Due</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {data.assets?.map((a, i) => (
+              <tr key={i}>
+                <td className="px-4 py-2.5 capitalize">{a.type}</td>
+                <td className="px-4 py-2.5">{a.name}</td>
+                <td className="px-4 py-2.5">{a.quantity}</td>
+                <td className="px-4 py-2.5">{a.due_date || "--"}</td>
+              </tr>
+            ))}
+            {(!data.assets || data.assets.length === 0) && (
+              <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-400">No issued assets.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {childView && (
+        <div className="card overflow-hidden">
+          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+            <span className="text-sm font-semibold text-slate-600">Fee Payments & Receipts</span>
+            <span className="text-xs text-slate-400">Balance due {inr(data.fees.balance)}</span>
+          </div>
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-4 py-3">Receipt No</th>
+                <th className="px-4 py-3">Date</th>
+                <th className="px-4 py-3">Method</th>
+                <th className="px-4 py-3">Amount</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {data.payments?.map((p) => (
+                <tr key={p.id} className="hover:bg-slate-50">
+                  <td className="px-4 py-2.5 font-medium">{p.receipt_no}</td>
+                  <td className="px-4 py-2.5">{p.paid_at || "—"}</td>
+                  <td className="px-4 py-2.5 uppercase">{p.method}</td>
+                  <td className="px-4 py-2.5">{inr(p.amount)}</td>
+                  <td className="px-4 py-2.5 text-right">
+                    <button className="btn-ghost px-2.5 py-1 text-xs text-brand-600" onClick={() => printReceipt(data.student.name, p)}>
+                      Download Receipt
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {(!data.payments || data.payments.length === 0) && (
+                <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">No payments yet.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -376,7 +485,9 @@ export function ParentPortal() {
 
 // ---------------------------------------------------------------- Teacher portal
 interface TeacherDash {
-  teacher: { name: string; designation?: string; department?: string } | null;
+  teacher: { name: string; designation?: string; department?: string; email?: string; phone?: string } | null;
+  profile?: { expertise?: string; certifications?: string; subjects_can_teach?: string; qualification?: string } | null;
+  assignments?: { id: string; grade: string; section: string; subject: string }[];
   cards: { key: string; label: string; value: number; icon: string }[];
   announcements: { title: string; body?: string; date?: string }[];
 }
@@ -393,6 +504,29 @@ function TeacherHome() {
         <div className="text-xl font-semibold">{data?.teacher?.name ?? "Teacher"}</div>
         <div className="text-sm text-slate-400">
           {data?.teacher?.designation} {data?.teacher?.department ? `· ${data.teacher.department}` : ""}
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="card p-5">
+          <h3 className="mb-3 text-sm font-semibold text-slate-600">Profile</h3>
+          <div className="space-y-2 text-sm text-slate-600">
+            <div><span className="font-medium">Qualification:</span> {data?.profile?.qualification || "--"}</div>
+            <div><span className="font-medium">Expertise:</span> {data?.profile?.expertise || "--"}</div>
+            <div><span className="font-medium">Can teach:</span> {data?.profile?.subjects_can_teach || "--"}</div>
+            <div><span className="font-medium">Certifications:</span> {data?.profile?.certifications || "--"}</div>
+          </div>
+        </div>
+        <div className="card p-5">
+          <h3 className="mb-3 text-sm font-semibold text-slate-600">Class Assignments</h3>
+          <div className="space-y-2">
+            {data?.assignments?.map((a) => (
+              <div key={a.id} className="rounded-lg border border-slate-100 px-3 py-2 text-sm">
+                <span className="font-medium">{a.subject}</span>
+                <span className="ml-2 text-slate-400">{a.grade} / {a.section}</span>
+              </div>
+            ))}
+            {(!data?.assignments || data.assignments.length === 0) && <div className="text-sm text-slate-400">No assignments mapped.</div>}
+          </div>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -427,6 +561,8 @@ function TeacherStudents() {
             <th className="px-4 py-3">Name</th>
             <th className="px-4 py-3">Grade</th>
             <th className="px-4 py-3">Section</th>
+            <th className="px-4 py-3">Contact</th>
+            <th className="px-4 py-3">Govt ID</th>
             <th className="px-4 py-3">Status</th>
           </tr>
         </thead>
@@ -437,12 +573,14 @@ function TeacherStudents() {
               <td className="px-4 py-2.5 font-medium">{s.name}</td>
               <td className="px-4 py-2.5">{s.grade}</td>
               <td className="px-4 py-2.5">{s.section}</td>
+              <td className="px-4 py-2.5 text-xs text-slate-500">{s.phone || s.email || "--"}</td>
+              <td className="px-4 py-2.5 text-xs">{s.government_id_type ? `${s.government_id_type}: ${s.government_id_masked}` : "--"}</td>
               <td className="px-4 py-2.5">{s.status}</td>
             </tr>
           ))}
           {(!data || data.length === 0) && (
             <tr>
-              <td colSpan={5} className="px-4 py-6 text-center text-slate-400">No students.</td>
+              <td colSpan={7} className="px-4 py-6 text-center text-slate-400">No students.</td>
             </tr>
           )}
         </tbody>
@@ -507,20 +645,85 @@ function TeacherSubmissions() {
   );
 }
 
+function TeacherSchedule() {
+  const { data } = useQuery({
+    queryKey: ["portal-teacher-schedule"],
+    queryFn: async () => (await api.get<{ classes: any[]; exams: any[] }>("/portal/teacher/schedule")).data,
+  });
+  return (
+    <div className="space-y-5">
+      <div className="card overflow-hidden">
+        <div className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-600">Class Schedule</div>
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+            <tr><th className="px-4 py-3">Day</th><th className="px-4 py-3">Period</th><th className="px-4 py-3">Class</th><th className="px-4 py-3">Subject</th><th className="px-4 py-3">Time</th></tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {data?.classes.map((c) => (
+              <tr key={c.id}><td className="px-4 py-2.5">{c.day}</td><td className="px-4 py-2.5">{c.period_no}</td><td className="px-4 py-2.5">{c.grade}/{c.section}</td><td className="px-4 py-2.5">{c.subject}</td><td className="px-4 py-2.5">{c.start_time || "--"} - {c.end_time || "--"}</td></tr>
+            ))}
+            {(!data?.classes || data.classes.length === 0) && <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">No classes scheduled.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      <div className="card overflow-hidden">
+        <div className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-600">Exam Duties</div>
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+            <tr><th className="px-4 py-3">Exam</th><th className="px-4 py-3">Subject</th><th className="px-4 py-3">Class</th><th className="px-4 py-3">Date</th><th className="px-4 py-3">Room</th></tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {data?.exams.map((e) => (
+              <tr key={e.id}><td className="px-4 py-2.5">{e.exam}</td><td className="px-4 py-2.5">{e.subject}</td><td className="px-4 py-2.5">{e.grade}/{e.section}</td><td className="px-4 py-2.5">{e.date || "--"}</td><td className="px-4 py-2.5">{e.room || "--"}</td></tr>
+            ))}
+            {(!data?.exams || data.exams.length === 0) && <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">No exam duties.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function TeacherMarksReview() {
+  const { data } = useQuery({
+    queryKey: ["portal-teacher-marks-review"],
+    queryFn: async () => (await api.get<any[]>("/portal/teacher/marks-review")).data,
+  });
+  return (
+    <div className="card overflow-hidden">
+      <table className="w-full text-sm">
+        <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+          <tr><th className="px-4 py-3">Exam</th><th className="px-4 py-3">Subject</th><th className="px-4 py-3">Class</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Note</th></tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {data?.map((b) => (
+            <tr key={b.id}><td className="px-4 py-2.5">{b.exam}</td><td className="px-4 py-2.5">{b.subject}</td><td className="px-4 py-2.5">{b.grade}/{b.section}</td><td className="px-4 py-2.5 capitalize">{b.status}</td><td className="px-4 py-2.5">{b.review_note || "--"}</td></tr>
+          ))}
+          {(!data || data.length === 0) && <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">No marks batches assigned for review.</td></tr>}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function TeacherPortal() {
   return (
     <PortalShell
       portal="teacher"
       nav={[
         { label: "Dashboard", icon: "grid", to: "" },
+        { label: "Schedule", icon: "table", to: "schedule" },
         { label: "My Students", icon: "users", to: "students" },
         { label: "Grade Homework", icon: "book", to: "submissions" },
+        { label: "Marks Review", icon: "check-square", to: "marks-review" },
       ]}
     >
       <Routes>
         <Route index element={<TeacherHome />} />
+        <Route path="schedule" element={<TeacherSchedule />} />
         <Route path="students" element={<TeacherStudents />} />
         <Route path="submissions" element={<TeacherSubmissions />} />
+        <Route path="marks-review" element={<TeacherMarksReview />} />
         <Route path="*" element={<Navigate to="" replace />} />
       </Routes>
     </PortalShell>

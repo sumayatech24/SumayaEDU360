@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ResourcePage } from "../components/ResourcePage";
 import { api, apiError } from "../lib/api";
 import type { Page } from "../lib/types";
@@ -26,6 +26,33 @@ interface Subject {
   code: string;
 }
 
+interface Grade {
+  id: string;
+  name: string;
+}
+
+interface Section {
+  id: string;
+  name: string;
+  grade_id: string;
+}
+
+interface MarkSheet {
+  exam: { id: string; name: string; code: string };
+  batch?: { id: string; status: string; reviewer_id?: string | null; review_note?: string | null } | null;
+  rows: {
+    student_id: string;
+    admission_no: string;
+    roll_no?: string | null;
+    student_name: string;
+    marks_obtained: string;
+    max_marks: string;
+    is_absent: boolean;
+    remarks?: string | null;
+    grade?: string | null;
+  }[];
+}
+
 interface ReportCard {
   exam: { name: string; type: string };
   student: { name: string; admission_no: string };
@@ -48,8 +75,11 @@ export function Exams() {
   const [examId, setExamId] = useState("");
   const [studentId, setStudentId] = useState("");
   const [subjectId, setSubjectId] = useState("");
+  const [gradeId, setGradeId] = useState("");
+  const [sectionId, setSectionId] = useState("");
   const [marks, setMarks] = useState("");
   const [maxMarks, setMaxMarks] = useState("100");
+  const [sheetRows, setSheetRows] = useState<MarkSheet["rows"]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<ReportCard | null>(null);
@@ -66,28 +96,80 @@ export function Exams() {
     queryKey: ["exam-subjects"],
     queryFn: async () => (await api.get<Page<Subject>>("/subjects", { params: { page_size: 200 } })).data,
   });
+  const { data: grades } = useQuery({
+    queryKey: ["exam-grades"],
+    queryFn: async () => (await api.get<Page<Grade>>("/grades", { params: { page_size: 200 } })).data,
+  });
+  const { data: sections } = useQuery({
+    queryKey: ["exam-sections"],
+    queryFn: async () => (await api.get<Page<Section>>("/sections", { params: { page_size: 200 } })).data,
+  });
+
+  const sheet = useQuery({
+    queryKey: ["marks-sheet", examId, subjectId, gradeId, sectionId],
+    enabled: tab === "marks" && !!examId && !!subjectId,
+    queryFn: async () =>
+      (
+        await api.get<MarkSheet>(`/exams/${examId}/marks-sheet`, {
+          params: {
+            subject_id: subjectId,
+            grade_id: gradeId || undefined,
+            section_id: sectionId || undefined,
+          },
+        })
+      ).data,
+  });
 
   const enterMarks = useMutation({
-    mutationFn: async () =>
-      api.post(`/exams/${examId}/marks`, {
-        entries: [
-          {
-            student_id: studentId,
-            subject_id: subjectId,
-            marks_obtained: Number(marks),
-            max_marks: Number(maxMarks),
-          },
-        ],
-      }),
+    mutationFn: async () => {
+      if (!window.confirm("Save this marksheet as draft? Please confirm the entered marks before saving.")) {
+        throw new Error("Cancelled");
+      }
+      return api.post(`/exams/${examId}/marks-sheet`, {
+        subject_id: subjectId,
+        grade_id: gradeId || null,
+        section_id: sectionId || null,
+        entries: sheetRows.map((r) => ({
+          student_id: r.student_id,
+          subject_id: subjectId,
+          marks_obtained: Number(r.marks_obtained || 0),
+          max_marks: Number(r.max_marks || maxMarks || 100),
+          is_absent: r.is_absent,
+          remarks: r.remarks,
+        })),
+      });
+    },
     onSuccess: (r) => {
-      setMessage(`Recorded ${r.data.count} mark entry.`);
+      setMessage(`Saved ${r.data.count} marks as draft.`);
       setError(null);
       setReport(null);
+      sheet.refetch();
     },
     onError: (e) => {
       setError(apiError(e));
       setMessage(null);
     },
+  });
+
+  const submitBatch = useMutation({
+    mutationFn: async () => api.post(`/exams/marks-batches/${sheet.data?.batch?.id}/submit`),
+    onSuccess: () => {
+      setMessage("Marks sent to reviewer.");
+      setError(null);
+      sheet.refetch();
+    },
+    onError: (e) => setError(apiError(e)),
+  });
+
+  const reviewBatch = useMutation({
+    mutationFn: async (decision: "approved" | "rejected" | "published") =>
+      api.post(`/exams/marks-batches/${sheet.data?.batch?.id}/review`, { decision }),
+    onSuccess: (r) => {
+      setMessage(`Batch ${r.data.status}.`);
+      setError(null);
+      sheet.refetch();
+    },
+    onError: (e) => setError(apiError(e)),
   });
 
   const loadReport = useMutation({
@@ -104,6 +186,10 @@ export function Exams() {
   });
 
   const selectedExam = exams?.items.find((e) => e.id === examId);
+
+  useEffect(() => {
+    setSheetRows(sheet.data?.rows ?? []);
+  }, [sheet.data]);
 
   return (
     <div className="space-y-5">
@@ -167,7 +253,7 @@ export function Exams() {
 
           {tab === "marks" && (
             <>
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-4">
                 <div>
                   <label className="label">Subject</label>
                   <select className="input" value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
@@ -180,31 +266,86 @@ export function Exams() {
                   </select>
                 </div>
                 <div>
-                  <label className="label">Marks Obtained</label>
-                  <input
-                    type="number"
-                    className="input"
-                    value={marks}
-                    onChange={(e) => setMarks(e.target.value)}
-                  />
+                  <label className="label">Grade</label>
+                  <select className="input" value={gradeId} onChange={(e) => { setGradeId(e.target.value); setSheetRows([]); }}>
+                    <option value="">All</option>
+                    {grades?.items.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  </select>
                 </div>
                 <div>
-                  <label className="label">Max Marks</label>
-                  <input
-                    type="number"
-                    className="input"
-                    value={maxMarks}
-                    onChange={(e) => setMaxMarks(e.target.value)}
-                  />
+                  <label className="label">Section</label>
+                  <select className="input" value={sectionId} onChange={(e) => { setSectionId(e.target.value); setSheetRows([]); }}>
+                    <option value="">All</option>
+                    {sections?.items
+                      .filter((s) => !gradeId || s.grade_id === gradeId)
+                      .map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Default Max Marks</label>
+                  <input type="number" className="input" value={maxMarks} onChange={(e) => setMaxMarks(e.target.value)} />
                 </div>
               </div>
-              <button
-                className="btn-primary"
-                disabled={!examId || !studentId || !subjectId || !marks || enterMarks.isPending}
-                onClick={() => enterMarks.mutate()}
-              >
-                {enterMarks.isPending ? "Saving..." : "Save Marks"}
-              </button>
+              {sheet.data?.batch && (
+                <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                  Batch status: <span className="font-semibold capitalize">{sheet.data.batch.status}</span>
+                </div>
+              )}
+              <div className="overflow-hidden rounded-lg border border-slate-200">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                    <tr>
+                      <th className="px-3 py-2">Roll</th>
+                      <th className="px-3 py-2">Student</th>
+                      <th className="px-3 py-2">Marks</th>
+                      <th className="px-3 py-2">Max</th>
+                      <th className="px-3 py-2">Absent</th>
+                      <th className="px-3 py-2">Remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {sheetRows.map((row, idx) => (
+                      <tr key={row.student_id}>
+                        <td className="px-3 py-2 text-slate-500">{row.roll_no || row.admission_no}</td>
+                        <td className="px-3 py-2 font-medium">{row.student_name}</td>
+                        <td className="px-3 py-2">
+                          <input className="input h-9 w-24" type="number" value={row.marks_obtained}
+                            onChange={(e) => setSheetRows((rows) => rows.map((r, i) => i === idx ? { ...r, marks_obtained: e.target.value } : r))} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input className="input h-9 w-24" type="number" value={row.max_marks || maxMarks}
+                            onChange={(e) => setSheetRows((rows) => rows.map((r, i) => i === idx ? { ...r, max_marks: e.target.value } : r))} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input type="checkbox" checked={row.is_absent}
+                            onChange={(e) => setSheetRows((rows) => rows.map((r, i) => i === idx ? { ...r, is_absent: e.target.checked } : r))} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input className="input h-9" value={row.remarks || ""}
+                            onChange={(e) => setSheetRows((rows) => rows.map((r, i) => i === idx ? { ...r, remarks: e.target.value } : r))} />
+                        </td>
+                      </tr>
+                    ))}
+                    {!sheet.isLoading && sheetRows.length === 0 && (
+                      <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">Select exam and subject to load students.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button className="btn-primary" disabled={!examId || !subjectId || sheetRows.length === 0 || enterMarks.isPending} onClick={() => enterMarks.mutate()}>
+                  {enterMarks.isPending ? "Saving..." : "Confirm & Save Draft"}
+                </button>
+                <button className="btn-ghost" disabled={!sheet.data?.batch?.id || submitBatch.isPending} onClick={() => submitBatch.mutate()}>
+                  Send to Review
+                </button>
+                <button className="btn-ghost" disabled={sheet.data?.batch?.status !== "submitted"} onClick={() => reviewBatch.mutate("approved")}>
+                  Approve
+                </button>
+                <button className="btn-ghost" disabled={sheet.data?.batch?.status !== "approved"} onClick={() => reviewBatch.mutate("published")}>
+                  Publish to Students
+                </button>
+              </div>
             </>
           )}
 

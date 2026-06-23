@@ -17,11 +17,11 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
-from datetime import date, time
+from datetime import date, datetime, time, timezone
 from decimal import Decimal
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -34,6 +34,7 @@ from app.models import (
     Employee,
     EntityDef,
     Exam,
+    ExamSubject,
     FeePlan,
     FieldDef,
     Grade,
@@ -42,8 +43,12 @@ from app.models import (
     HostelBlock,
     HostelRoom,
     LeaveType,
+    BookIssue,
     LibraryBook,
+    MarksBatch,
     Activity,
+    AssetAssignment,
+    InventoryItem,
     TransportRoute,
     TimetablePeriod,
     Vehicle,
@@ -62,6 +67,8 @@ from app.models import (
     Student,
     Subject,
     Tenant,
+    TeacherAssignment,
+    TeacherProfile,
     User,
     UserRole,
 )
@@ -280,6 +287,11 @@ MASTERS: dict[str, tuple[str, list[str]]] = {
     "discipline_status": ("Discipline Status", ["Open", "Closed"]),
     "remark_type": ("Remark Type", ["General", "Special", "Health", "Counseling", "Appreciation"]),
     "nationality": ("Nationality", ["Indian", "Other"]),
+    "government_id_type": ("Government ID Type", ["Aadhaar", "PAN", "Passport", "Voter ID", "Other"]),
+    "asset_assignee_type": ("Asset Assignee Type", ["Student", "Employee", "Location"]),
+    "asset_assignment_status": ("Asset Assignment Status", ["Issued", "Returned", "Lost", "Damaged"]),
+    "exam_schedule_status": ("Exam Schedule Status", ["Scheduled", "Completed", "Cancelled"]),
+    "marks_batch_status": ("Marks Batch Status", ["Draft", "Submitted", "Approved", "Rejected", "Published"]),
 }
 
 # Typed module pages handled by dedicated React screens (slug -> path).
@@ -329,11 +341,34 @@ async def get_or_create(db: AsyncSession, model, defaults: dict | None = None, *
     return obj, True
 
 
+async def ensure_runtime_schema(db: AsyncSession) -> None:
+    """Idempotent column upgrades for existing PostgreSQL dev databases."""
+    bind = db.get_bind()
+    if bind.dialect.name != "postgresql":
+        return
+    statements = [
+        "ALTER TABLE student ADD COLUMN IF NOT EXISTS permanent_address TEXT",
+        "ALTER TABLE student ADD COLUMN IF NOT EXISTS government_id_type VARCHAR(40)",
+        "ALTER TABLE student ADD COLUMN IF NOT EXISTS government_id_number VARCHAR(80)",
+        "ALTER TABLE student ADD COLUMN IF NOT EXISTS emergency_contact_name VARCHAR(150)",
+        "ALTER TABLE student ADD COLUMN IF NOT EXISTS emergency_contact_phone VARCHAR(32)",
+        "ALTER TABLE guardian ADD COLUMN IF NOT EXISTS address TEXT",
+        "ALTER TABLE guardian ADD COLUMN IF NOT EXISTS government_id_type VARCHAR(40)",
+        "ALTER TABLE guardian ADD COLUMN IF NOT EXISTS government_id_number VARCHAR(80)",
+        "ALTER TABLE employee ADD COLUMN IF NOT EXISTS address TEXT",
+        "ALTER TABLE employee ADD COLUMN IF NOT EXISTS government_id_type VARCHAR(40)",
+        "ALTER TABLE employee ADD COLUMN IF NOT EXISTS government_id_number VARCHAR(80)",
+    ]
+    for stmt in statements:
+        await db.execute(text(stmt))
+
+
 async def seed() -> None:
     await init_models()
     spec = json.loads(SPEC_PATH.read_text(encoding="utf-8"))
 
     async with AsyncSessionLocal() as db:
+        await ensure_runtime_schema(db)
         # ---------------------------------------------------------------- tenant
         tenant, _ = await get_or_create(
             db, Tenant, code="SUMAYA",
@@ -833,6 +868,19 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
                     defaults={"marks_obtained": Decimal(str(72 + j * 6)), "max_marks": Decimal("100"),
                               "grade_letter": "B+"},
                 )
+                await get_or_create(
+                    db, ExamSubject, tenant_id=tid, exam_id=exam.id, subject_id=sub.id,
+                    grade_id=first_student.grade_id, section_id=first_student.section_id,
+                    defaults={"exam_date": date(2026, 9, 10 + j), "max_marks": Decimal("100"),
+                              "pass_marks": Decimal("33"), "schedule_status": "scheduled"},
+                )
+                await get_or_create(
+                    db, MarksBatch, tenant_id=tid, exam_id=exam.id, subject_id=sub.id,
+                    grade_id=first_student.grade_id, section_id=first_student.section_id,
+                    defaults={"batch_status": "published", "submitted_at": datetime.now(timezone.utc),
+                              "reviewed_at": datetime.now(timezone.utc), "published_at": datetime.now(timezone.utc),
+                              "review_note": "Demo marks approved and published."},
+                )
 
         # Enrich the demo student's full profile
         first_student.admission_date = date(2023, 4, 1)
@@ -840,6 +888,10 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
         first_student.religion = "hindu"
         first_student.nationality = "indian"
         first_student.mother_tongue = "Hindi"
+        first_student.government_id_type = "aadhaar"
+        first_student.government_id_number = "123412341234"
+        first_student.emergency_contact_name = "Rakesh Gupta"
+        first_student.emergency_contact_phone = "9810000001"
         first_student.house = "Blue House"
         first_student.address = "12, Rose Lane, Sector 4"
         first_student.city = "Bengaluru"
@@ -877,6 +929,43 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
                       "remarked_on": date.today(), "is_visible_to_parent": True},
         )
 
+        # A part-payment so the parent portal shows a receipt
+        from app.models import Payment
+
+        inv = (
+            await db.execute(select(Invoice).where(Invoice.tenant_id == tid, Invoice.student_id == first_student.id))
+        ).scalars().first()
+        if inv and (inv.paid_amount or Decimal(0)) <= 0:
+            pay, created = await get_or_create(
+                db, Payment, tenant_id=tid, receipt_no="RCPT-000001",
+                defaults={"invoice_id": inv.id, "student_id": first_student.id, "amount": Decimal("25000"),
+                          "method": "upi", "reference": "UPI-DEMO-001", "paid_at": date.today()},
+            )
+            if created:
+                inv.paid_amount = Decimal("25000")
+                inv.payment_status = "partial"
+
+        ball, _ = await get_or_create(
+            db, InventoryItem, tenant_id=tid, code="SPORT-FOOTBALL-01",
+            defaults={"name": "Football", "category": "Sports", "unit": "pcs",
+                      "quantity_on_hand": 20, "reorder_level": 5, "unit_cost": Decimal("900")},
+        )
+        await get_or_create(
+            db, AssetAssignment, tenant_id=tid, item_id=ball.id, student_id=first_student.id,
+            assignee_type="student",
+            defaults={"quantity": 1, "issue_date": date.today(), "due_date": date(2026, 8, 31),
+                      "assignment_status": "issued", "remarks": "Issued for inter-house practice."},
+        )
+        first_book = (
+            await db.execute(select(LibraryBook).where(LibraryBook.tenant_id == tid).order_by(LibraryBook.isbn))
+        ).scalars().first()
+        if first_book:
+            await get_or_create(
+                db, BookIssue, tenant_id=tid, book_id=first_book.id, student_id=first_student.id,
+                defaults={"issue_date": date.today(), "due_date": date(2026, 7, 31),
+                          "issue_status": "issued"},
+            )
+
     await get_or_create(
         db, Announcement, tenant_id=tid, title="Annual Sports Day on the 15th",
         defaults={"audience": "all", "channel": "in_app", "announcement_status": "published",
@@ -884,9 +973,37 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
     )
 
     # ---- Portal demo users (one per persona) ----
-    teacher_emp = (
-        await db.execute(select(Employee).where(Employee.tenant_id == tid).order_by(Employee.employee_no))
+    principal_emp = (
+        await db.execute(select(Employee).where(
+            Employee.tenant_id == tid, Employee.designation.ilike("%principal%")
+        ).order_by(Employee.employee_no))
     ).scalars().first()
+    teacher_emp = (
+        await db.execute(select(Employee).where(
+            Employee.tenant_id == tid, Employee.designation.ilike("%teacher%")
+        ).order_by(Employee.employee_no))
+    ).scalars().first()
+    if teacher_emp:
+        teacher_emp.address = teacher_emp.address or "Faculty Quarters, Sumaya Campus"
+        teacher_emp.government_id_type = teacher_emp.government_id_type or "pan"
+        teacher_emp.government_id_number = teacher_emp.government_id_number or "ABCDE1234F"
+        await get_or_create(
+            db, TeacherProfile, tenant_id=tid, employee_id=teacher_emp.id,
+            defaults={"expertise": "Primary Mathematics, English literacy, activity-based learning",
+                      "certifications": "B.Ed; CBSE Foundational Literacy Certification",
+                      "subjects_can_teach": "English, Mathematics, Science",
+                      "qualification": "M.A., B.Ed",
+                      "reporting_manager_id": principal_emp.id if principal_emp else None},
+        )
+        for sub in (await db.execute(select(Subject).where(Subject.tenant_id == tid).limit(3))).scalars().all():
+            await get_or_create(
+                db, TeacherAssignment, tenant_id=tid, employee_id=teacher_emp.id,
+                grade_id=grades[0].id if grades else None,
+                section_id=sections[0].id if sections else None,
+                subject_id=sub.id,
+                defaults={"academic_year_id": ay.id, "reporting_manager_id": principal_emp.id if principal_emp else None,
+                          "effective_from": date(2026, 4, 1), "assignment_status": "active"},
+            )
     roles = {
         c: (await db.execute(select(Role).where(Role.tenant_id == tid, Role.code == c))).scalars().first()
         for c in ("student", "parent", "teacher")
@@ -895,6 +1012,9 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
     async def _portal_user(email, name, pw, role, person_type, person_id):
         u = (await db.execute(select(User).where(User.email == email))).scalars().first()
         if u:
+            u.full_name = name
+            u.person_type = person_type
+            u.person_id = person_id
             return
         u = User(tenant_id=tid, email=email, full_name=name, hashed_password=hash_password(pw),
                  is_active=True, is_superadmin=False, person_type=person_type, person_id=person_id)

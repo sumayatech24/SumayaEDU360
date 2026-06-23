@@ -189,6 +189,11 @@ class StudentBase(_StudentExtra):
     email: str | None = None
     phone: str | None = None
     address: str | None = None
+    permanent_address: str | None = None
+    government_id_type: str | None = None
+    government_id_number: str | None = None
+    emergency_contact_name: str | None = None
+    emergency_contact_phone: str | None = None
     academic_year_id: uuid.UUID | None = None
     grade_id: uuid.UUID | None = None
     section_id: uuid.UUID | None = None
@@ -211,6 +216,11 @@ class StudentUpdate(_StudentExtra):
     email: str | None = None
     phone: str | None = None
     address: str | None = None
+    permanent_address: str | None = None
+    government_id_type: str | None = None
+    government_id_number: str | None = None
+    emergency_contact_name: str | None = None
+    emergency_contact_phone: str | None = None
     academic_year_id: uuid.UUID | None = None
     grade_id: uuid.UUID | None = None
     section_id: uuid.UUID | None = None
@@ -229,6 +239,9 @@ class GuardianBase(_C):
     phone: str | None = None
     email: str | None = None
     occupation: str | None = None
+    address: str | None = None
+    government_id_type: str | None = None
+    government_id_number: str | None = None
     is_primary: bool = False
 
 
@@ -242,6 +255,9 @@ class GuardianUpdate(_C):
     phone: str | None = None
     email: str | None = None
     occupation: str | None = None
+    address: str | None = None
+    government_id_type: str | None = None
+    government_id_number: str | None = None
     is_primary: bool | None = None
 
 
@@ -258,6 +274,9 @@ class EmployeeBase(_C):
     phone: str | None = None
     designation: str | None = None
     department: str | None = None
+    address: str | None = None
+    government_id_type: str | None = None
+    government_id_number: str | None = None
     date_of_joining: date | None = None
     employment_type: str = "full_time"
     salary: Decimal | None = None
@@ -277,6 +296,9 @@ class EmployeeUpdate(_C):
     phone: str | None = None
     designation: str | None = None
     department: str | None = None
+    address: str | None = None
+    government_id_type: str | None = None
+    government_id_number: str | None = None
     date_of_joining: date | None = None
     employment_type: str | None = None
     salary: Decimal | None = None

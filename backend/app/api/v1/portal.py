@@ -22,8 +22,9 @@ from app.models.academic import Grade, Section, Subject
 from app.models.academics_ops import Homework, HomeworkSubmission, TimetablePeriod
 from app.models.attendance import Attendance
 from app.models.auth import User
+from app.models.exams import Exam, ExamSubject, Marks, MarksBatch
 from app.models.operations import Activity, ActivityRegistration, Announcement
-from app.models.people import Employee, Student
+from app.models.people import Employee, Student, TeacherAssignment, TeacherProfile
 
 router = APIRouter(prefix="/portal", tags=["Portals"])
 
@@ -91,6 +92,13 @@ async def _linked_student_id(db: AsyncSession, user: CurrentUser) -> uuid.UUID:
     return db_user.person_id
 
 
+async def _linked_employee_id(db: AsyncSession, user: CurrentUser) -> uuid.UUID:
+    db_user = await db.get(User, user.id)
+    if not db_user or not db_user.person_id or db_user.person_type != "employee":
+        raise HTTPException(404, "No employee linked to this account")
+    return db_user.person_id
+
+
 async def _name_maps(db: AsyncSession, tid: uuid.UUID):
     async def collect(model, label):
         rows = (await db.execute(select(model).where(
@@ -133,11 +141,29 @@ async def my_announcements(
 async def student_dashboard(
     db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user)
 ):
-    """Self-scoped 360 for a student or a parent (their linked child)."""
+    """Self-scoped 360 for a student or a parent (their linked child).
+
+    Fee visibility differs by persona: a student only sees whether fees are pending
+    (not the full ledger); a parent sees the full ledger, payments and can download
+    receipts. Remarks flagged not-visible-to-parent are hidden from parents.
+    """
     student_id = await _linked_student_id(db, user)
+    is_parent = "parent" in user.roles
     data = await student_360(str(student_id), db, user)
     data["announcements"] = await _announcements(db, user.tenant_id,
-                                                  "parents" if "parent" in user.roles else "students")
+                                                  "parents" if is_parent else "students")
+    data["persona"] = "parent" if is_parent else "student"
+
+    if not is_parent:
+        # Student: only a pending-due signal, no amounts/ledger.
+        balance = float(data["fees"]["balance"])
+        data["fees"] = {"pending": balance > 0, "balance": data["fees"]["balance"]}
+        data["invoices"] = []
+        data["payments"] = []
+    else:
+        data["fees"]["pending"] = float(data["fees"]["balance"]) > 0
+        data["remarks"] = [r for r in data["remarks"] if r.get("visible_to_parent", True)]
+
     return data
 
 
@@ -352,11 +378,42 @@ async def teacher_dashboard(
     tid = user.tenant_id
     db_user = await db.get(User, user.id)
     teacher = None
+    profile = None
+    assignments = []
     if db_user.person_id:
         emp = await db.get(Employee, db_user.person_id)
         if emp:
             teacher = {"name": f"{emp.first_name} {emp.last_name or ''}".strip(),
-                       "designation": emp.designation, "department": emp.department}
+                       "designation": emp.designation, "department": emp.department,
+                       "email": emp.email, "phone": emp.phone}
+            prof = (await db.execute(select(TeacherProfile).where(
+                TeacherProfile.tenant_id == tid,
+                TeacherProfile.employee_id == emp.id,
+                TeacherProfile.is_deleted.is_(False),
+            ))).scalars().first()
+            if prof:
+                profile = {
+                    "expertise": prof.expertise,
+                    "certifications": prof.certifications,
+                    "subjects_can_teach": prof.subjects_can_teach,
+                    "qualification": prof.qualification,
+                }
+            maps = await _name_maps(db, tid)
+            rows = (await db.execute(select(TeacherAssignment).where(
+                TeacherAssignment.tenant_id == tid,
+                TeacherAssignment.employee_id == emp.id,
+                TeacherAssignment.assignment_status == "active",
+                TeacherAssignment.is_deleted.is_(False),
+            ))).scalars().all()
+            assignments = [
+                {
+                    "id": str(a.id),
+                    "grade": maps["grades"].get(a.grade_id, "All"),
+                    "section": maps["sections"].get(a.section_id, "All"),
+                    "subject": maps["subjects"].get(a.subject_id, "General"),
+                }
+                for a in rows
+            ]
 
     students = (
         await db.execute(select(func.count()).select_from(Student).where(
@@ -380,6 +437,8 @@ async def teacher_dashboard(
 
     return {
         "teacher": teacher,
+        "profile": profile,
+        "assignments": assignments,
         "cards": [
             {"key": "students", "label": "Students", "value": students, "icon": "users"},
             {"key": "marked_today", "label": "Attendance Marked Today", "value": marked_today, "icon": "check-square"},
@@ -394,19 +453,34 @@ async def teacher_dashboard(
 async def teacher_students(
     db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user)
 ):
-    """Class roster for the teacher portal (read-only)."""
+    """Assigned class roster for the teacher portal (read-only)."""
     tid = user.tenant_id
+    emp_id = await _linked_employee_id(db, user)
     maps = await _name_maps(db, tid)
-    rows = (
-        await db.execute(select(Student).where(Student.tenant_id == tid, Student.is_deleted.is_(False))
-                         .order_by(Student.admission_no))
-    ).scalars().all()
+    assignments = (await db.execute(select(TeacherAssignment).where(
+        TeacherAssignment.tenant_id == tid,
+        TeacherAssignment.employee_id == emp_id,
+        TeacherAssignment.assignment_status == "active",
+        TeacherAssignment.is_deleted.is_(False),
+    ))).scalars().all()
+    conditions = [Student.tenant_id == tid, Student.is_deleted.is_(False)]
+    if assignments:
+        grade_ids = {a.grade_id for a in assignments if a.grade_id}
+        section_ids = {a.section_id for a in assignments if a.section_id}
+        if grade_ids:
+            conditions.append(Student.grade_id.in_(grade_ids))
+        if section_ids:
+            conditions.append(Student.section_id.in_(section_ids))
+    rows = (await db.execute(select(Student).where(*conditions).order_by(Student.admission_no))).scalars().all()
     return [
         {
             "id": str(s.id), "admission_no": s.admission_no,
             "name": f"{s.first_name} {s.last_name or ''}".strip(),
             "grade": maps["grades"].get(s.grade_id, "—"), "section": maps["sections"].get(s.section_id, "—"),
-            "status": s.enrollment_status,
+            "status": s.enrollment_status, "phone": s.phone, "email": s.email,
+            "address": s.address, "government_id_type": s.government_id_type,
+            "government_id_masked": ("*" * max(len(s.government_id_number or "") - 4, 0) + (s.government_id_number or "")[-4:])
+            if s.government_id_number else None,
         }
         for s in rows
     ]
@@ -440,6 +514,99 @@ async def teacher_submissions(
             "content": s.content,
         }
         for s in rows
+    ]
+
+
+@router.get("/teacher/schedule")
+async def teacher_schedule(
+    db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user)
+):
+    tid = user.tenant_id
+    emp_id = await _linked_employee_id(db, user)
+    maps = await _name_maps(db, tid)
+    assignments = (await db.execute(select(TeacherAssignment).where(
+        TeacherAssignment.tenant_id == tid,
+        TeacherAssignment.employee_id == emp_id,
+        TeacherAssignment.assignment_status == "active",
+        TeacherAssignment.is_deleted.is_(False),
+    ))).scalars().all()
+    grade_ids = {a.grade_id for a in assignments if a.grade_id}
+    section_ids = {a.section_id for a in assignments if a.section_id}
+    subject_ids = {a.subject_id for a in assignments if a.subject_id}
+    tt_conditions = [TimetablePeriod.tenant_id == tid, TimetablePeriod.is_deleted.is_(False)]
+    if grade_ids:
+        tt_conditions.append(TimetablePeriod.grade_id.in_(grade_ids))
+    if section_ids:
+        tt_conditions.append(TimetablePeriod.section_id.in_(section_ids))
+    if subject_ids:
+        tt_conditions.append(TimetablePeriod.subject_id.in_(subject_ids))
+    periods = (await db.execute(select(TimetablePeriod).where(*tt_conditions)
+                                .order_by(TimetablePeriod.day_of_week, TimetablePeriod.period_no))).scalars().all()
+    exam_conditions = [ExamSubject.tenant_id == tid, ExamSubject.is_deleted.is_(False)]
+    if grade_ids:
+        exam_conditions.append(ExamSubject.grade_id.in_(grade_ids))
+    if section_ids:
+        exam_conditions.append(ExamSubject.section_id.in_(section_ids))
+    if subject_ids:
+        exam_conditions.append(ExamSubject.subject_id.in_(subject_ids))
+    exam_rows = (await db.execute(select(ExamSubject).where(*exam_conditions)
+                                  .order_by(ExamSubject.exam_date))).scalars().all()
+    exam_names = {
+        e.id: e.name
+        for e in (await db.execute(select(Exam).where(Exam.tenant_id == tid))).scalars().all()
+    }
+    return {
+        "classes": [
+            {
+                "id": str(p.id), "day": p.day_of_week, "period_no": p.period_no,
+                "subject": maps["subjects"].get(p.subject_id, "General"),
+                "grade": maps["grades"].get(p.grade_id, "All"),
+                "section": maps["sections"].get(p.section_id, "All"),
+                "room": p.room,
+                "start_time": p.start_time.strftime("%H:%M") if p.start_time else None,
+                "end_time": p.end_time.strftime("%H:%M") if p.end_time else None,
+            }
+            for p in periods
+        ],
+        "exams": [
+            {
+                "id": str(e.id), "exam": exam_names.get(e.exam_id, "Exam"),
+                "subject": maps["subjects"].get(e.subject_id, "General"),
+                "grade": maps["grades"].get(e.grade_id, "All"),
+                "section": maps["sections"].get(e.section_id, "All"),
+                "date": e.exam_date.isoformat() if e.exam_date else None,
+                "room": e.room, "status": e.schedule_status,
+            }
+            for e in exam_rows
+        ],
+    }
+
+
+@router.get("/teacher/marks-review")
+async def teacher_marks_review(
+    db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user)
+):
+    tid = user.tenant_id
+    emp_id = await _linked_employee_id(db, user)
+    maps = await _name_maps(db, tid)
+    exam_names = {
+        e.id: e.name
+        for e in (await db.execute(select(Exam).where(Exam.tenant_id == tid))).scalars().all()
+    }
+    rows = (await db.execute(select(MarksBatch).where(
+        MarksBatch.tenant_id == tid,
+        MarksBatch.reviewer_id == emp_id,
+        MarksBatch.is_deleted.is_(False),
+    ).order_by(MarksBatch.updated_at.desc()))).scalars().all()
+    return [
+        {
+            "id": str(b.id), "exam": exam_names.get(b.exam_id, "Exam"),
+            "subject": maps["subjects"].get(b.subject_id, "General"),
+            "grade": maps["grades"].get(b.grade_id, "All"),
+            "section": maps["sections"].get(b.section_id, "All"),
+            "status": b.batch_status, "review_note": b.review_note,
+        }
+        for b in rows
     ]
 
 

@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime, time
 
-from sqlalchemy import Date, ForeignKey, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import Date, DateTime, ForeignKey, Numeric, String, Text, Time, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -24,6 +24,50 @@ class Exam(BaseEntity, Base):
     end_date: Mapped[date] = mapped_column(Date, nullable=True)
     max_marks: Mapped[Numeric] = mapped_column(Numeric(6, 2), default=100, nullable=False)
     pass_marks: Mapped[Numeric] = mapped_column(Numeric(6, 2), default=33, nullable=False)
+
+
+class ExamSubject(BaseEntity, Base):
+    """One scheduled paper within an exam plan."""
+
+    __tablename__ = "exam_subject"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "exam_id", "subject_id", "grade_id", "section_id", name="uq_exam_subject"),
+    )
+
+    exam_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("exam.id"), index=True)
+    subject_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("subject.id"), index=True)
+    grade_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("grade.id"), nullable=True, index=True)
+    section_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("section.id"), nullable=True, index=True)
+    assigned_teacher_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("employee.id"), nullable=True)
+    exam_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    start_time: Mapped[time | None] = mapped_column(Time, nullable=True)
+    end_time: Mapped[time | None] = mapped_column(Time, nullable=True)
+    room: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    max_marks: Mapped[Numeric] = mapped_column(Numeric(6, 2), default=100, nullable=False)
+    pass_marks: Mapped[Numeric] = mapped_column(Numeric(6, 2), default=33, nullable=False)
+    schedule_status: Mapped[str] = mapped_column(String(30), default="scheduled", nullable=False)
+
+
+class MarksBatch(BaseEntity, Base):
+    """Bulk mark-entry sheet lifecycle: draft -> submitted -> approved -> published."""
+
+    __tablename__ = "marks_batch"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "exam_id", "subject_id", "grade_id", "section_id", name="uq_marks_batch_scope"),
+    )
+
+    exam_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("exam.id"), index=True)
+    subject_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("subject.id"), index=True)
+    grade_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("grade.id"), nullable=True, index=True)
+    section_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("section.id"), nullable=True, index=True)
+    teacher_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("employee.id"), nullable=True)
+    reviewer_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("employee.id"), nullable=True)
+    batch_status: Mapped[str] = mapped_column(String(30), default="draft", nullable=False)
+    # draft / submitted / approved / rejected / published
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class QuestionPaper(BaseEntity, Base):

@@ -13,6 +13,7 @@ from app.api.v1 import (
     generic,
     masters,
     meta,
+    portal,
     promotion,
     reporting,
     reports,
@@ -23,6 +24,7 @@ from app.api.v1 import (
 
 api_router = APIRouter()
 api_router.include_router(auth.router)
+api_router.include_router(portal.router)
 api_router.include_router(meta.router)
 api_router.include_router(masters.router)
 api_router.include_router(users.router)

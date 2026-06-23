@@ -736,6 +736,64 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
             defaults={"name": nm, "max_days_per_year": days, "is_paid": True},
         )
 
+    # ---- Richer data for portals: guardian, marks, a published announcement ----
+    from app.models import Announcement, Guardian, Marks
+
+    first_student = (
+        await db.execute(select(Student).where(Student.tenant_id == tid, Student.admission_no == "ADM20250001"))
+    ).scalars().first()
+    exam = (await db.execute(select(Exam).where(Exam.tenant_id == tid, Exam.code == "UT1-2526"))).scalars().first()
+    subs = (await db.execute(select(Subject).where(Subject.tenant_id == tid).limit(3))).scalars().all()
+    if first_student:
+        await get_or_create(
+            db, Guardian, tenant_id=tid, student_id=first_student.id, relation="father",
+            defaults={"full_name": "Rakesh Gupta", "phone": "9810000001",
+                      "email": "rakesh@example.com", "is_primary": True},
+        )
+        if exam:
+            for j, sub in enumerate(subs):
+                await get_or_create(
+                    db, Marks, tenant_id=tid, exam_id=exam.id, student_id=first_student.id, subject_id=sub.id,
+                    defaults={"marks_obtained": Decimal(str(72 + j * 6)), "max_marks": Decimal("100"),
+                              "grade_letter": "B+"},
+                )
+    await get_or_create(
+        db, Announcement, tenant_id=tid, title="Annual Sports Day on the 15th",
+        defaults={"audience": "all", "channel": "in_app", "announcement_status": "published",
+                  "publish_date": date.today(), "body": "All students and parents are invited to attend."},
+    )
+
+    # ---- Portal demo users (one per persona) ----
+    teacher_emp = (
+        await db.execute(select(Employee).where(Employee.tenant_id == tid).order_by(Employee.employee_no))
+    ).scalars().first()
+    roles = {
+        c: (await db.execute(select(Role).where(Role.tenant_id == tid, Role.code == c))).scalars().first()
+        for c in ("student", "parent", "teacher")
+    }
+
+    async def _portal_user(email, name, pw, role, person_type, person_id):
+        u = (await db.execute(select(User).where(User.email == email))).scalars().first()
+        if u:
+            return
+        u = User(tenant_id=tid, email=email, full_name=name, hashed_password=hash_password(pw),
+                 is_active=True, is_superadmin=False, person_type=person_type, person_id=person_id)
+        db.add(u)
+        await db.flush()
+        if role:
+            await get_or_create(db, UserRole, user_id=u.id, role_id=role.id)
+
+    if first_student and roles["student"]:
+        await _portal_user("student@sumaya.edu", "Aarav Gupta", "Student@123",
+                           roles["student"], "student", first_student.id)
+    if first_student and roles["parent"]:
+        await _portal_user("parent@sumaya.edu", "Rakesh Gupta", "Parent@123",
+                           roles["parent"], "student", first_student.id)
+    if teacher_emp and roles["teacher"]:
+        await _portal_user("teacher@sumaya.edu",
+                           f"{teacher_emp.first_name} {teacher_emp.last_name or ''}".strip(), "Teacher@123",
+                           roles["teacher"], "employee", teacher_emp.id)
+
 
 if __name__ == "__main__":
     asyncio.run(seed())

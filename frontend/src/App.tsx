@@ -7,7 +7,9 @@ import { ActivitiesPage } from "./pages/ActivitiesPage";
 import { Admissions } from "./pages/Admissions";
 import { Attendance } from "./pages/Attendance";
 import { Audit } from "./pages/Audit";
+import { CMS } from "./pages/CMS";
 import { Communication } from "./pages/Communication";
+import { Curriculum } from "./pages/Curriculum";
 import { Dashboard } from "./pages/Dashboard";
 import { Exams } from "./pages/Exams";
 import { Fees } from "./pages/Fees";
@@ -15,13 +17,18 @@ import { Finance } from "./pages/Finance";
 import { HomeworkPage } from "./pages/HomeworkPage";
 import { Hostel } from "./pages/Hostel";
 import { HR } from "./pages/HR";
+import { KnowledgeBase } from "./pages/KnowledgeBase";
 import { Library } from "./pages/Library";
 import { Login } from "./pages/Login";
 import { Masters } from "./pages/Masters";
+import { Meals } from "./pages/Meals";
 import { ModulePage } from "./pages/ModulePage";
 import { Promotion } from "./pages/Promotion";
+import { QuestionBank } from "./pages/QuestionBank";
 import { Reports } from "./pages/Reports";
 import { Store } from "./pages/Store";
+import { Timetable } from "./pages/Timetable";
+import { Transport } from "./pages/Transport";
 import { Users } from "./pages/Users";
 
 function Protected({ children }: { children: React.ReactNode }) {
@@ -56,6 +63,13 @@ export default function App() {
         <Route path="/homework" element={<HomeworkPage />} />
         <Route path="/activities" element={<ActivitiesPage />} />
         <Route path="/communication" element={<Communication />} />
+        <Route path="/transport" element={<Transport />} />
+        <Route path="/meals" element={<Meals />} />
+        <Route path="/timetable" element={<Timetable />} />
+        <Route path="/curriculum" element={<Curriculum />} />
+        <Route path="/cms" element={<CMS />} />
+        <Route path="/knowledge" element={<KnowledgeBase />} />
+        <Route path="/question-bank" element={<QuestionBank />} />
         <Route path="/promotion" element={<Promotion />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/masters" element={<Masters />} />

@@ -323,6 +323,7 @@ CORE_NAV = [
     ("Website & CMS", "grid", "/cms", "public_website_cms", "public_website_cms:read", 32),
     ("Reports", "activity", "/reports", "dashboards_analytics", "dashboards_analytics:read", 80),
     ("Masters", "sliders", "/masters", "academic_configuration", "academic_configuration:read", 90),
+    ("Branding", "grid", "/branding", "security_compliance", "security_compliance:read", 89),
     ("Integrations", "cube", "/integrations", "integrations", "integrations:read", 93),
     ("Users & Roles", "shield", "/users", "security_compliance", "security_compliance:read", 91),
     ("Audit Log", "activity", "/audit", "security_compliance", "security_compliance:read", 92),
@@ -635,12 +636,22 @@ async def seed() -> None:
             )
 
         # ---------------------------------------------------------------- settings
+        _logo = (
+            "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E"
+            "%3Crect width='64' height='64' rx='14' fill='%232563eb'/%3E"
+            "%3Cpath d='M32 16 8 26l24 10 24-10z' fill='white'/%3E"
+            "%3Cpath d='M18 33v9c0 4 28 4 28 0v-9' fill='none' stroke='white' stroke-width='3'/%3E%3C/svg%3E"
+        )
         for key, value in {
             "general.institution_name": "Sumaya International School",
             "general.academic_board": "CBSE",
             "fees.currency": "INR",
             "fees.late_fee_percent": 2,
             "attendance.methods_enabled": ["manual", "qr", "rfid", "biometric"],
+            "branding.institution_name": "Sumaya International School",
+            "branding.logo_url": _logo,
+            "branding.tagline": "Excellence in Education",
+            "branding.primary_color": "#2563eb",
         }.items():
             await get_or_create(
                 db, Setting, tenant_id=tid, key=key,

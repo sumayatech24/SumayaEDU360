@@ -7,6 +7,7 @@ import { ActivitiesPage } from "./pages/ActivitiesPage";
 import { Admissions } from "./pages/Admissions";
 import { Attendance } from "./pages/Attendance";
 import { Audit } from "./pages/Audit";
+import { Branding } from "./pages/Branding";
 import { CMS } from "./pages/CMS";
 import { Communication } from "./pages/Communication";
 import { Curriculum } from "./pages/Curriculum";
@@ -75,6 +76,7 @@ function AdminApp() {
         <Route path="/reports" element={<Reports />} />
         <Route path="/integrations" element={<Integrations />} />
         <Route path="/masters" element={<Masters />} />
+        <Route path="/branding" element={<Branding />} />
         <Route path="/users" element={<Users />} />
         <Route path="/audit" element={<Audit />} />
         <Route

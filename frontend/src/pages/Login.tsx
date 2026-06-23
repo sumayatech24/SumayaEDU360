@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiError } from "../lib/api";
 import { PORTAL_BASE, useAuth } from "../lib/auth";
+import { Brand } from "../components/Brand";
 
 export function Login() {
   const { login } = useAuth();
@@ -28,14 +29,8 @@ export function Login() {
   return (
     <div className="flex h-full items-center justify-center bg-gradient-to-br from-brand-600 to-brand-900 p-6">
       <div className="card w-full max-w-md p-8">
-        <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-lg font-bold text-white">
-            S
-          </div>
-          <div>
-            <div className="text-lg font-bold">SumayaEDU360</div>
-            <div className="text-xs text-slate-400">AI EduOS — Education ERP</div>
-          </div>
+        <div className="mb-6">
+          <Brand size={44} />
         </div>
 
         <form onSubmit={submit} className="space-y-4">

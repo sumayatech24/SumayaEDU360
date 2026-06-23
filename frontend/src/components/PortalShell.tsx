@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import { useBranding } from "../lib/branding";
 import { Icon } from "./Icon";
 
 export interface PortalNavItem {
@@ -25,6 +26,7 @@ export function PortalShell({
   children: ReactNode;
 }) {
   const { portal: ctx, logout } = useAuth();
+  const b = useBranding();
   const theme = THEMES[portal];
 
   return (
@@ -32,11 +34,15 @@ export function PortalShell({
       <header className={`bg-gradient-to-r ${theme.from} text-white`}>
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${theme.chip} font-bold`}>
-              S
-            </div>
+            {b.logo_url ? (
+              <img src={b.logo_url} alt="" className="h-10 w-10 rounded-xl object-contain bg-white/10 p-0.5" />
+            ) : (
+              <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${theme.chip} font-bold`}>
+                {b.institution_name[0]}
+              </div>
+            )}
             <div>
-              <div className="text-sm font-bold leading-tight">SumayaEDU360</div>
+              <div className="text-sm font-bold leading-tight">{b.institution_name}</div>
               <div className="text-[11px] text-white/70">{theme.tag}</div>
             </div>
           </div>

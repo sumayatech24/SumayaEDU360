@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { MenuItem } from "../lib/types";
+import { Brand } from "./Brand";
 import { GlobalSearch } from "./GlobalSearch";
 import { Icon } from "./Icon";
 
@@ -21,14 +22,8 @@ export function Layout() {
   return (
     <div className="flex h-full">
       <aside className="flex w-64 flex-col border-r border-slate-200 bg-white">
-        <div className="flex items-center gap-2 px-5 py-4">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 font-bold text-white">
-            S
-          </div>
-          <div>
-            <div className="text-sm font-bold leading-tight">SumayaEDU360</div>
-            <div className="text-[11px] text-slate-400">AI EduOS</div>
-          </div>
+        <div className="px-5 py-4">
+          <Brand size={36} />
         </div>
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-6">

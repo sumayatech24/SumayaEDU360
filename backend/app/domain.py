@@ -20,6 +20,7 @@ from pydantic import BaseModel, ConfigDict, create_model
 from app.core.database import Base
 from app.models import (
     academics_ops,
+    content,
     finance,
     hostel,
     hr,
@@ -436,6 +437,59 @@ DOMAIN_SPECS: list[EntitySpec] = [
             _f("link_url", "Link URL"),
             _f("sort_order", "Order", "number"),
             _f("is_active", "Active", "bool"),
+        ],
+    ),
+    # ----------------------------------------------------------------- Digital Learning Repository
+    EntitySpec(
+        content.LearningResource, "learning-resource", "Learning Resource", "digital_learning_repository",
+        kind="master", icon="book", search_fields=["title"],
+        fields=[
+            _f("title", "Title", required=True),
+            _f("resource_type", "Type", "select", options_master="resource_type"),
+            _f("subject_id", "Subject", "reference", reference_entity="subject"),
+            _f("grade_id", "Grade", "reference", reference_entity="grade"),
+            _f("url", "URL"),
+            _f("description", "Description", "text", list_visible=False),
+        ],
+    ),
+    # ----------------------------------------------------------------- Knowledge Base
+    EntitySpec(
+        content.KnowledgeArticle, "knowledge-article", "Knowledge Article", "knowledge_base",
+        kind="transaction", icon="book", search_fields=["title", "category"],
+        fields=[
+            _f("title", "Title", required=True),
+            _f("category", "Category"),
+            _f("audience", "Audience", "select", options_master="audience"),
+            _f("body", "Body", "text", list_visible=False),
+            _f("is_published", "Published", "bool"),
+        ],
+    ),
+    # ----------------------------------------------------------------- Question Paper / Bank
+    EntitySpec(
+        content.QuestionBankItem, "question-bank-item", "Question Bank", "question_paper_management",
+        kind="transaction", icon="edit", search_fields=["question_text"],
+        fields=[
+            _f("subject_id", "Subject", "reference", reference_entity="subject"),
+            _f("grade_id", "Grade", "reference", reference_entity="grade"),
+            _f("question_type", "Type", "select", options_master="question_type"),
+            _f("difficulty", "Difficulty", "select", options_master="difficulty"),
+            _f("marks", "Marks", "number"),
+            _f("question_text", "Question", "text", required=True),
+            _f("answer_text", "Answer", "text", list_visible=False),
+        ],
+    ),
+    # ----------------------------------------------------------------- PTM
+    EntitySpec(
+        content.PtmMeeting, "ptm-meeting", "PTM Meeting", "ptm_communication",
+        kind="transaction", icon="users", search_fields=["title"],
+        fields=[
+            _f("title", "Title", required=True),
+            _f("student_id", "Student", "reference", reference_entity="student"),
+            _f("meeting_date", "Date", "date"),
+            _f("slot_time", "Slot", "time"),
+            _f("mode", "Mode", "select", options_master="meeting_mode"),
+            _f("meeting_status", "Status", "select", options_master="meeting_status"),
+            _f("notes", "Notes", "text", list_visible=False),
         ],
     ),
 ]

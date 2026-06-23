@@ -50,6 +50,12 @@ from app.models.finance import (  # noqa: F401
     PurchaseOrder,
     Vendor,
 )
+from app.models.content import (  # noqa: F401
+    KnowledgeArticle,
+    LearningResource,
+    PtmMeeting,
+    QuestionBankItem,
+)
 from app.models.hostel import HostelAllocation, HostelBlock, HostelRoom  # noqa: F401
 from app.models.operations import (  # noqa: F401
     Activity,
@@ -96,4 +102,5 @@ __all__ = [
     "LedgerAccount", "Vendor", "Expense", "PurchaseOrder",
     "InventoryItem", "StockMovement", "Activity", "ActivityRegistration",
     "MealPlan", "MealMenu", "Announcement", "CmsPage", "Banner",
+    "LearningResource", "KnowledgeArticle", "QuestionBankItem", "PtmMeeting",
 ]

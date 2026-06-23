@@ -251,6 +251,11 @@ MASTERS: dict[str, tuple[str, list[str]]] = {
     "comm_channel": ("Communication Channel", ["In App", "Email", "SMS", "WhatsApp", "Push"]),
     "announcement_status": ("Announcement Status", ["Draft", "Published", "Archived"]),
     "cms_page_type": ("CMS Page Type", ["Page", "News", "Event", "Blog"]),
+    "resource_type": ("Resource Type", ["Document", "Video", "Ebook", "Notes", "Recording", "Link"]),
+    "question_type": ("Question Type", ["MCQ", "Short", "Long", "True/False", "Fill in the Blank"]),
+    "difficulty": ("Difficulty", ["Easy", "Medium", "Hard"]),
+    "meeting_mode": ("Meeting Mode", ["In Person", "Online"]),
+    "meeting_status": ("Meeting Status", ["Scheduled", "Completed", "Cancelled", "No Show"]),
 }
 
 # Typed module pages handled by dedicated React screens (slug -> path).

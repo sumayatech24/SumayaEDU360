@@ -22,20 +22,20 @@ Every tier saves to PostgreSQL with tenant isolation, RBAC and audit.
 | M008 | Curriculum & Lesson Planning | **Typed CRUD** | Lesson plans typed (objectives, completion %) |
 | M009 | Timetable & Scheduling | **Typed CRUD** | Periods typed (grade/section/day/period); conflict engine TBD |
 | M010 | Attendance | **Workflow** | Bulk marking + daily summary |
-| M011 | Homework & Assignments | **Workflow** | Homework + submissions + grading endpoint |
+| M011 | Homework & Assignments | **Workflow** | Bespoke screen: homework + submissions + Grade action |
 | M012 | Examination Management | **Workflow** | Exams typed + marks entry + report card |
-| M013 | Question Paper Management | Metadata | Blueprint/moderation TBD |
+| M013 | Question Paper Management | **Typed CRUD** | Question bank (type/difficulty/marks); moderation TBD |
 | M014 | Report Cards & Transcripts | **Workflow** | Report-card generation + promotion rules |
 | M015 | Library Management | **Workflow** | Catalog + issue/return/renew + auto fines |
-| M016 | Digital Learning Repository | Metadata | Resources as records |
+| M016 | Digital Learning Repository | **Typed CRUD** | Learning resources (docs/videos/ebooks) by subject/grade |
 | M017 | Fees & Billing | **Workflow** | Plans → invoices → payments, ledger, status |
-| M018 | Finance & Accounting | **Workflow** | Ledger, vendors, expenses (approve), PO; +Store/Inventory with stock-movement adjusting on-hand |
+| M018 | Finance & Accounting | **Workflow** | Bespoke screen: ledger, vendors, expenses (Approve/Reject/Pay), PO; +Store/Inventory with Stock In/Out adjusting on-hand |
 | M019 | Meal & Cafeteria | **Typed CRUD** | Meal plans + weekly menus typed |
 | M020 | Transport | **Typed CRUD** | Routes, vehicles, stops, student assignments |
 | M021 | Hostel | **Workflow** | Blocks, rooms, allocate/vacate + occupancy |
-| M022 | Activities & Events | **Workflow** | Activities + capacity-aware registration |
-| M023 | PTM & Communication | **Workflow** | Announcements + publish; channels modelled |
-| M024 | Knowledge Base | Metadata | Articles as records |
+| M022 | Activities & Events | **Workflow** | Bespoke screen: activities + capacity-aware registration |
+| M023 | PTM & Communication | **Workflow** | Announcements (Publish) + PTM meeting slots/status |
+| M024 | Knowledge Base | **Typed CRUD** | Articles (category/audience/publish) |
 | M025 | Dashboards & Analytics | **Workflow** | Live aggregates (students/fees/attendance) |
 | M026 | AI Copilots | Metadata | Module registered; RAG/agents TBD |
 | M027 | Mobile Apps | — | API-ready; native apps out of scope here |
@@ -65,3 +65,10 @@ Every tier saves to PostgreSQL with tenant isolation, RBAC and audit.
   Accounting, **Store/Inventory**, Activities, Meals, Communication and CMS — all saving.
 - Added lifecycle endpoints: expense approval, stock movement (adjusts on-hand), homework
   grading, capacity-aware activity registration, announcement publish.
+- Added reusable row-actions to the generic grid + a tabbed `Workbench`, then bespoke screens:
+  Finance (expense approve/reject/pay), Store/Inventory (stock in/out), Homework (grade),
+  Activities, Communication (publish).
+- Added typed Digital Library, Knowledge Base, Question Bank and PTM-meeting domains
+  (registry now declares 33 typed entities — near-complete coverage of the 30 modules).
+- Dashboard enriched with books-issued, pending-leave, expenses-to-approve, low-stock and
+  activities cards (rendered dynamically from the reports endpoint).

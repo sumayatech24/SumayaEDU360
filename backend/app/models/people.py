@@ -32,6 +32,19 @@ class Student(BaseEntity, Base):
     # enrolled / promoted / graduated / transferred / dropped
     photo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
+    # Extended personal / admission details
+    admission_date: Mapped["Date"] = mapped_column(Date, nullable=True)
+    category: Mapped[str | None] = mapped_column(String(40), nullable=True)  # General/OBC/SC/ST/EWS
+    religion: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    nationality: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    mother_tongue: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    id_number: Mapped[str | None] = mapped_column(String(40), nullable=True)  # Aadhaar / national ID
+    house: Mapped[str | None] = mapped_column(String(40), nullable=True)  # school house
+    previous_school: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    state: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    pincode: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
 
 class Guardian(BaseEntity, Base):
     __tablename__ = "guardian"

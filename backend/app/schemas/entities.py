@@ -164,7 +164,21 @@ class SubjectOut(AuditedOut, SubjectBase):
 
 
 # ----------------------------------------------------------------------------- People
-class StudentBase(_C):
+class _StudentExtra(_C):
+    admission_date: date | None = None
+    category: str | None = None
+    religion: str | None = None
+    nationality: str | None = None
+    mother_tongue: str | None = None
+    id_number: str | None = None
+    house: str | None = None
+    previous_school: str | None = None
+    city: str | None = None
+    state: str | None = None
+    pincode: str | None = None
+
+
+class StudentBase(_StudentExtra):
     admission_no: str
     roll_no: str | None = None
     first_name: str
@@ -186,7 +200,7 @@ class StudentCreate(StudentBase):
     pass
 
 
-class StudentUpdate(_C):
+class StudentUpdate(_StudentExtra):
     admission_no: str | None = None
     roll_no: str | None = None
     first_name: str | None = None

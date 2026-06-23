@@ -76,6 +76,12 @@ from app.models.people import (  # noqa: F401
     Student,
     Teacher,
 )
+from app.models.student_records import (  # noqa: F401
+    Achievement,
+    DisciplinaryAction,
+    StudentAcademicHistory,
+    StudentRemark,
+)
 from app.models.tenant import Campus, Institution, Tenant  # noqa: F401
 from app.models.transport import (  # noqa: F401
     RouteStop,
@@ -103,4 +109,5 @@ __all__ = [
     "InventoryItem", "StockMovement", "Activity", "ActivityRegistration",
     "MealPlan", "MealMenu", "Announcement", "CmsPage", "Banner",
     "LearningResource", "KnowledgeArticle", "QuestionBankItem", "PtmMeeting",
+    "StudentAcademicHistory", "Achievement", "DisciplinaryAction", "StudentRemark",
 ]

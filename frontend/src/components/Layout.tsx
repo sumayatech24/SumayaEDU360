@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { MenuItem } from "../lib/types";
+import { GlobalSearch } from "./GlobalSearch";
 import { Icon } from "./Icon";
 
 export function Layout() {
@@ -45,9 +46,12 @@ export function Layout() {
 
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
-          <button className="btn-ghost text-sm" onClick={() => navigate(-1)}>
-            ← Back
-          </button>
+          <div className="flex items-center gap-3">
+            <button className="btn-ghost text-sm" onClick={() => navigate(-1)}>
+              ← Back
+            </button>
+            <GlobalSearch />
+          </div>
           <div className="flex items-center gap-3">
             <div className="text-right">
               <div className="text-sm font-medium">{me?.full_name}</div>

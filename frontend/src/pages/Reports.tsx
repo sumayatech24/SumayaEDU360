@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { SearchBox } from "../components/SearchBox";
 import { api } from "../lib/api";
+import { filterByQuery } from "../lib/search";
 
 interface ReportFilter {
   key: string;
@@ -24,6 +26,7 @@ interface ReportResult {
 export function Reports() {
   const [selected, setSelected] = useState<ReportMeta | null>(null);
   const [filters, setFilters] = useState<Record<string, string>>({});
+  const [search, setSearch] = useState("");
 
   const { data: catalog = [] } = useQuery({
     queryKey: ["report-catalog"],
@@ -118,15 +121,20 @@ export function Reports() {
                 </div>
               ))}
             </div>
-            <button className="btn-primary" disabled={!result?.rows.length} onClick={exportCsv}>
-              Export CSV
-            </button>
+            <div className="flex items-end gap-2">
+              <SearchBox value={search} onChange={setSearch} placeholder="Filter rows…" className="w-52" />
+              <button className="btn-primary" disabled={!result?.rows.length} onClick={exportCsv}>
+                Export CSV
+              </button>
+            </div>
           </div>
 
           <div className="card overflow-hidden">
             <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
               <h3 className="text-sm font-semibold text-slate-600">{result?.name ?? "—"}</h3>
-              <span className="text-xs text-slate-400">{result?.total ?? 0} rows</span>
+              <span className="text-xs text-slate-400">
+                {filterByQuery(result?.rows, search).length} / {result?.total ?? 0} rows
+              </span>
             </div>
             <div className="max-h-[60vh] overflow-auto">
               <table className="w-full text-sm">
@@ -148,7 +156,8 @@ export function Reports() {
                     </tr>
                   )}
                   {!isFetching &&
-                    result?.rows.map((row, i) => (
+                    result &&
+                    filterByQuery(result.rows, search).map((row, i) => (
                       <tr key={i} className="hover:bg-slate-50">
                         {result.columns.map((c) => (
                           <td key={c.key} className="px-4 py-2.5">
@@ -157,7 +166,7 @@ export function Reports() {
                         ))}
                       </tr>
                     ))}
-                  {!isFetching && (result?.rows.length ?? 0) === 0 && (
+                  {!isFetching && filterByQuery(result?.rows, search).length === 0 && (
                     <tr>
                       <td colSpan={result?.columns.length ?? 1} className="px-4 py-8 text-center text-slate-400">
                         No data for this report.

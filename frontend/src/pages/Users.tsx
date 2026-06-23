@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { api, apiError } from "../lib/api";
 import { Modal } from "../components/Modal";
+import { SearchBox } from "../components/SearchBox";
+import { filterByQuery } from "../lib/search";
 
 interface Role {
   id: string;
@@ -22,6 +24,7 @@ export function Users() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ email: "", full_name: "", password: "", role_codes: [] as string[] });
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   const { data: users = [] } = useQuery({
     queryKey: ["users"],
@@ -50,9 +53,12 @@ export function Users() {
           <h1 className="text-2xl font-semibold">Users & Roles</h1>
           <p className="text-sm text-slate-400">{roles.length} roles loaded from the RBAC matrix.</p>
         </div>
-        <button className="btn-primary" onClick={() => setOpen(true)}>
-          + New User
-        </button>
+        <div className="flex items-center gap-2">
+          <SearchBox value={search} onChange={setSearch} placeholder="Search users…" />
+          <button className="btn-primary" onClick={() => setOpen(true)}>
+            + New User
+          </button>
+        </div>
       </div>
 
       <div className="card overflow-hidden">
@@ -66,7 +72,7 @@ export function Users() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {users.map((u) => (
+            {filterByQuery(users, search).map((u) => (
               <tr key={u.id} className="hover:bg-slate-50">
                 <td className="px-4 py-3 font-medium">{u.full_name}</td>
                 <td className="px-4 py-3">{u.email}</td>

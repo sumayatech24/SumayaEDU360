@@ -26,6 +26,7 @@ from app.models import (
     hr,
     library,
     operations,
+    student_records,
     transport,
 )
 
@@ -476,6 +477,59 @@ DOMAIN_SPECS: list[EntitySpec] = [
             _f("marks", "Marks", "number"),
             _f("question_text", "Question", "text", required=True),
             _f("answer_text", "Answer", "text", list_visible=False),
+        ],
+    ),
+    # ----------------------------------------------------------------- Student records
+    EntitySpec(
+        student_records.StudentAcademicHistory, "academic-history", "Academic History",
+        "student_information_system", kind="transaction", icon="trending-up", search_fields=["academic_year", "grade"],
+        fields=[
+            _f("student_id", "Student", "reference", required=True, reference_entity="student"),
+            _f("academic_year", "Academic Year", required=True),
+            _f("grade", "Class", required=True),
+            _f("section", "Section"),
+            _f("result", "Result", "select", options_master="academic_result"),
+            _f("percentage", "Percentage", "decimal"),
+            _f("rank", "Rank", "number"),
+            _f("remarks", "Remarks"),
+        ],
+    ),
+    EntitySpec(
+        student_records.Achievement, "achievement", "Achievement", "student_information_system",
+        kind="transaction", icon="trending-up", search_fields=["title"],
+        fields=[
+            _f("student_id", "Student", "reference", required=True, reference_entity="student"),
+            _f("title", "Title", required=True),
+            _f("category", "Category", "select", options_master="achievement_category"),
+            _f("level", "Level", "select", options_master="achievement_level"),
+            _f("achieved_on", "Date", "date"),
+            _f("description", "Description", "text", list_visible=False),
+        ],
+    ),
+    EntitySpec(
+        student_records.DisciplinaryAction, "disciplinary-action", "Disciplinary Action",
+        "student_information_system", kind="transaction", icon="shield", search_fields=["incident_type"],
+        fields=[
+            _f("student_id", "Student", "reference", required=True, reference_entity="student"),
+            _f("incident_date", "Date", "date"),
+            _f("incident_type", "Incident", required=True),
+            _f("severity", "Severity", "select", options_master="discipline_severity"),
+            _f("description", "Description", "text", list_visible=False),
+            _f("action_taken", "Action Taken"),
+            _f("reported_by", "Reported By"),
+            _f("status", "Status", "select", options_master="discipline_status"),
+        ],
+    ),
+    EntitySpec(
+        student_records.StudentRemark, "student-remark", "Student Remark", "student_information_system",
+        kind="transaction", icon="edit", search_fields=["remark"],
+        fields=[
+            _f("student_id", "Student", "reference", required=True, reference_entity="student"),
+            _f("remark_type", "Type", "select", options_master="remark_type"),
+            _f("remark", "Remark", "text", required=True),
+            _f("remarked_by", "By"),
+            _f("remarked_on", "Date", "date"),
+            _f("is_visible_to_parent", "Visible to Parent", "bool"),
         ],
     ),
     # ----------------------------------------------------------------- PTM

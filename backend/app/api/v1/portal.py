@@ -37,6 +37,26 @@ class GradeIn(BaseModel):
     remarks: str | None = None
 
 
+class AttEntry(BaseModel):
+    student_id: uuid.UUID
+    state: str = "present"
+
+
+class BulkAttIn(BaseModel):
+    att_date: date
+    entries: list[AttEntry]
+
+
+class HomeworkCreateIn(BaseModel):
+    title: str
+    subject_id: uuid.UUID | None = None
+    grade_id: uuid.UUID | None = None
+    section_id: uuid.UUID | None = None
+    due_date: date | None = None
+    description: str | None = None
+    max_marks: float = 10
+
+
 def portal_for(roles: list[str], is_super: bool) -> str:
     if is_super:
         return "admin"
@@ -440,3 +460,75 @@ async def teacher_grade(
     await db.flush()
     await record_audit(db, action="grade", entity="HomeworkSubmission", entity_id=sub.id, actor=user)
     return {"id": str(sub.id), "status": sub.submission_status, "marks_awarded": str(sub.marks_awarded)}
+
+
+@router.post("/teacher/attendance")
+async def teacher_mark_attendance(
+    payload: BulkAttIn,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Teacher bulk-marks attendance for a date (idempotent per student/date)."""
+    tid = user.tenant_id
+    written = 0
+    for entry in payload.entries:
+        existing = (await db.execute(select(Attendance).where(
+            Attendance.tenant_id == tid, Attendance.student_id == entry.student_id,
+            Attendance.att_date == payload.att_date))).scalars().first()
+        if existing:
+            existing.state = entry.state
+            existing.marked_by = user.id
+            existing.updated_by = user.id
+        else:
+            db.add(Attendance(
+                tenant_id=tid, student_id=entry.student_id, att_date=payload.att_date,
+                state=entry.state, method="manual", marked_by=user.id,
+                created_by=user.id, updated_by=user.id,
+            ))
+        written += 1
+    await db.flush()
+    await record_audit(db, action="bulk_mark", entity="Attendance", actor=user,
+                       changes={"date": payload.att_date.isoformat(), "count": written})
+    return {"detail": "attendance recorded", "count": written, "date": payload.att_date.isoformat()}
+
+
+@router.get("/teacher/homework")
+async def teacher_homework_list(
+    db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user)
+):
+    tid = user.tenant_id
+    maps = await _name_maps(db, tid)
+    rows = (await db.execute(select(Homework).where(
+        Homework.tenant_id == tid, Homework.is_deleted.is_(False)
+    ).order_by(Homework.created_at.desc()))).scalars().all()
+    return [
+        {
+            "id": str(h.id), "title": h.title,
+            "subject": maps["subjects"].get(h.subject_id, "General"),
+            "grade": maps["grades"].get(h.grade_id, "All"),
+            "due_date": h.due_date.isoformat() if h.due_date else None,
+            "max_marks": str(h.max_marks), "status": h.homework_status,
+        }
+        for h in rows
+    ]
+
+
+@router.post("/teacher/homework")
+async def teacher_create_homework(
+    payload: HomeworkCreateIn,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    from decimal import Decimal
+
+    hw = Homework(
+        tenant_id=user.tenant_id, title=payload.title, subject_id=payload.subject_id,
+        grade_id=payload.grade_id, section_id=payload.section_id, due_date=payload.due_date,
+        assigned_date=date.today(), description=payload.description,
+        max_marks=Decimal(str(payload.max_marks)), homework_status="assigned",
+        created_by=user.id, updated_by=user.id,
+    )
+    db.add(hw)
+    await db.flush()
+    await record_audit(db, action="create", entity="Homework", entity_id=hw.id, actor=user)
+    return {"id": str(hw.id), "title": hw.title}

@@ -127,6 +127,19 @@ TYPED_FIELDS: dict[str, list[tuple]] = {
         ("enrollment_status", "Status", "select", False, True, "enrollment_status", None),
         ("phone", "Phone", "phone", False, True, None, None),
         ("email", "Email", "email", False, False, None, None),
+        ("blood_group", "Blood Group", "select", False, False, "blood_group", None),
+        ("category", "Category", "select", False, False, "category", None),
+        ("religion", "Religion", "select", False, False, "religion", None),
+        ("nationality", "Nationality", "select", False, False, "nationality", None),
+        ("mother_tongue", "Mother Tongue", "string", False, False, None, None),
+        ("id_number", "ID / Aadhaar No", "string", False, False, None, None),
+        ("house", "House", "string", False, False, None, None),
+        ("admission_date", "Admission Date", "date", False, False, None, None),
+        ("previous_school", "Previous School", "string", False, False, None, None),
+        ("address", "Address", "text", False, False, None, None),
+        ("city", "City", "string", False, False, None, None),
+        ("state", "State", "string", False, False, None, None),
+        ("pincode", "Pincode", "string", False, False, None, None),
     ],
     "guardian": [
         ("student_id", "Student", "reference", True, True, None, "student"),
@@ -260,6 +273,13 @@ MASTERS: dict[str, tuple[str, list[str]]] = {
     "difficulty": ("Difficulty", ["Easy", "Medium", "Hard"]),
     "meeting_mode": ("Meeting Mode", ["In Person", "Online"]),
     "meeting_status": ("Meeting Status", ["Scheduled", "Completed", "Cancelled", "No Show"]),
+    "academic_result": ("Academic Result", ["Promoted", "Passed", "Failed", "Detained"]),
+    "achievement_category": ("Achievement Category", ["Academic", "Sports", "Cultural", "Arts", "Leadership", "Other"]),
+    "achievement_level": ("Achievement Level", ["School", "District", "State", "National", "International"]),
+    "discipline_severity": ("Discipline Severity", ["Minor", "Major", "Severe"]),
+    "discipline_status": ("Discipline Status", ["Open", "Closed"]),
+    "remark_type": ("Remark Type", ["General", "Special", "Health", "Counseling", "Appreciation"]),
+    "nationality": ("Nationality", ["Indian", "Other"]),
 }
 
 # Typed module pages handled by dedicated React screens (slug -> path).
@@ -813,6 +833,50 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
                     defaults={"marks_obtained": Decimal(str(72 + j * 6)), "max_marks": Decimal("100"),
                               "grade_letter": "B+"},
                 )
+
+        # Enrich the demo student's full profile
+        first_student.admission_date = date(2023, 4, 1)
+        first_student.category = "general"
+        first_student.religion = "hindu"
+        first_student.nationality = "indian"
+        first_student.mother_tongue = "Hindi"
+        first_student.house = "Blue House"
+        first_student.address = "12, Rose Lane, Sector 4"
+        first_student.city = "Bengaluru"
+        first_student.state = "Karnataka"
+        first_student.pincode = "560001"
+
+        from app.models import (
+            Achievement,
+            DisciplinaryAction,
+            StudentAcademicHistory,
+            StudentRemark,
+        )
+
+        for yr, gr, res, pct in [("2023-2024", "LKG", "promoted", "88.50"),
+                                 ("2024-2025", "UKG", "promoted", "91.20")]:
+            await get_or_create(
+                db, StudentAcademicHistory, tenant_id=tid, student_id=first_student.id, academic_year=yr,
+                defaults={"grade": gr, "section": "A", "result": res, "percentage": Decimal(pct), "rank": 3},
+            )
+        await get_or_create(
+            db, Achievement, tenant_id=tid, student_id=first_student.id, title="1st Prize - Inter-school Quiz",
+            defaults={"category": "academic", "level": "district", "achieved_on": date(2025, 11, 20),
+                      "description": "Won the district-level science quiz."},
+        )
+        await get_or_create(
+            db, DisciplinaryAction, tenant_id=tid, student_id=first_student.id, incident_type="Late submission",
+            defaults={"incident_date": date(2025, 9, 5), "severity": "minor",
+                      "description": "Repeated late homework submission.", "action_taken": "Counseled",
+                      "reported_by": "Rahul Verma", "status": "closed"},
+        )
+        await get_or_create(
+            db, StudentRemark, tenant_id=tid, student_id=first_student.id,
+            remark="Consistently helpful and disciplined; a class monitor candidate.",
+            defaults={"remark_type": "appreciation", "remarked_by": "Anita Sharma (Principal)",
+                      "remarked_on": date.today(), "is_visible_to_parent": True},
+        )
+
     await get_or_create(
         db, Announcement, tenant_id=tid, title="Annual Sports Day on the 15th",
         defaults={"audience": "all", "channel": "in_app", "announcement_status": "published",

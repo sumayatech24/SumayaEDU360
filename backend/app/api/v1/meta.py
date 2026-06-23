@@ -13,7 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.deps import CurrentUser, get_current_user
+from app.core.deps import CurrentUser, get_current_user, require_permission
 from app.models.meta import EntityDef, FieldDef, MenuItem, Module, ModuleCapability
 
 router = APIRouter(tags=["Metadata"])
@@ -193,3 +193,41 @@ async def get_entity(slug: str, db: AsyncSession = Depends(get_db), user: Curren
     dto = EntityDefOut.model_validate(r)
     dto.fields = [FieldOut.model_validate(f) for f in fields]
     return dto
+
+
+class FieldUpdateIn(BaseModel):
+    label: str | None = None
+    is_required: bool | None = None
+    is_list_visible: bool | None = None
+    help_text: str | None = None
+    sort_order: int | None = None
+
+
+@router.put("/entities/{entity_slug}/fields/{field_name}")
+async def update_field(
+    entity_slug: str,
+    field_name: str,
+    payload: FieldUpdateIn,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_permission("academic_configuration:update")),
+):
+    """Admin field customisation — rename a field's label, toggle required/visibility."""
+    entity = (
+        await db.execute(select(EntityDef).where(EntityDef.tenant_id == user.tenant_id,
+                                                 EntityDef.slug == entity_slug))
+    ).scalars().first()
+    if not entity:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Entity not found")
+    field = (
+        await db.execute(select(FieldDef).where(FieldDef.entity_id == entity.id,
+                                                FieldDef.name == field_name, FieldDef.is_deleted.is_(False)))
+    ).scalars().first()
+    if not field:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Field not found")
+    data = payload.model_dump(exclude_unset=True)
+    for k, v in data.items():
+        setattr(field, k, v)
+    field.updated_by = user.id
+    await db.flush()
+    return {"name": field.name, "label": field.label, "is_required": field.is_required,
+            "is_list_visible": field.is_list_visible, "help_text": field.help_text}

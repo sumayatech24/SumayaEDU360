@@ -14,6 +14,7 @@ import { Curriculum } from "./pages/Curriculum";
 import { Dashboard } from "./pages/Dashboard";
 import { Exams } from "./pages/Exams";
 import { Fees } from "./pages/Fees";
+import { FieldCustomizer } from "./pages/FieldCustomizer";
 import { Finance } from "./pages/Finance";
 import { HomeworkPage } from "./pages/HomeworkPage";
 import { Hostel } from "./pages/Hostel";
@@ -77,6 +78,7 @@ function AdminApp() {
         <Route path="/integrations" element={<Integrations />} />
         <Route path="/masters" element={<Masters />} />
         <Route path="/branding" element={<Branding />} />
+        <Route path="/customize-fields" element={<FieldCustomizer />} />
         <Route path="/users" element={<Users />} />
         <Route path="/audit" element={<Audit />} />
         <Route

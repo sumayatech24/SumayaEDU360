@@ -305,7 +305,8 @@ CORE_NAV = [
     ("Fees & Billing", "credit-card", "/fees", "fees_billing", "fees_billing:read", 14),
     ("Attendance", "check-square", "/attendance", "attendance", "attendance:read", 15),
     ("Examinations", "edit", "/exams", "examination_management", "examination_management:read", 16),
-    ("Promotion", "trending-up", "/promotion", "report_cards_transcripts", "report_cards_transcripts:read", 17),
+    ("Promotion / Grade Upgrade", "trending-up", "/promotion", "report_cards_transcripts", "report_cards_transcripts:read", 17),
+    ("Teacher Allocation", "users", "/teacher-allocation", "teacher_management", "teacher_management:read", 13),
     ("Library", "book", "/library", "library_management", "library_management:read", 18),
     ("HR Operations", "briefcase", "/hr", "employee_hrms", "employee_hrms:read", 19),
     ("Hostel", "grid", "/hostel", "hostel", "hostel:read", 20),
@@ -1016,6 +1017,9 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
                 defaults={"academic_year_id": ay.id, "reporting_manager_id": principal_emp.id if principal_emp else None,
                           "effective_from": date(2026, 4, 1), "assignment_status": "active"},
             )
+        # Make this teacher the class teacher of the first section
+        if sections:
+            sections[0].class_teacher_id = teacher_emp.id
     roles = {
         c: (await db.execute(select(Role).where(Role.tenant_id == tid, Role.code == c))).scalars().first()
         for c in ("student", "parent", "teacher")

@@ -131,6 +131,16 @@ export function StudentProfile() {
           />
         </Section>
 
+        <Section title="Teachers" count={data.teachers?.length ?? 0}>
+          <div className="mb-2 text-xs text-slate-500">
+            Class Teacher: <span className="font-medium">{s.class_teacher || "—"}</span>
+          </div>
+          <Table
+            cols={[["name", "Teacher"], ["subject", "Subject"], ["designation", "Designation"]]}
+            rows={data.teachers ?? []}
+          />
+        </Section>
+
         <Section title="Academic History" count={data.academic_history.length}>
           <Table
             cols={[["year", "Year"], ["grade", "Class"], ["result", "Result"], ["percentage", "%"], ["rank", "Rank"]]}

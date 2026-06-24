@@ -33,6 +33,7 @@ import { QuestionBank } from "./pages/QuestionBank";
 import { Reports } from "./pages/Reports";
 import { Store } from "./pages/Store";
 import { StudentProfile } from "./pages/StudentProfile";
+import { TeacherAllocation } from "./pages/TeacherAllocation";
 import { Timetable } from "./pages/Timetable";
 import { Transport } from "./pages/Transport";
 import { Users } from "./pages/Users";
@@ -93,6 +94,7 @@ function AdminApp() {
           }
         />
         <Route path="/students/:id" element={<StudentProfile />} />
+        <Route path="/teacher-allocation" element={<TeacherAllocation />} />
         <Route
           path="/employees"
           element={<ResourcePage entitySlug="employee" permPrefix="employee_hrms" title="Employees / HR" />}

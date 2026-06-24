@@ -422,18 +422,39 @@ async def student_360(
                                                Payment.is_deleted.is_(False)).order_by(Payment.paid_at.desc()))
     ).scalars().all()
 
-    # Teachers: class teacher of the student's section + teaching staff
+    # Teachers: derived from the actual teacher→class/subject mappings for the
+    # student's grade & section (falls back to class teacher on the section).
+    from app.models.people import TeacherAssignment
+
     class_teacher = None
     section_obj = await db.get(Section, student.section_id) if student.section_id else None
     if section_obj and section_obj.class_teacher_id:
         ct = await db.get(Employee, section_obj.class_teacher_id)
         if ct:
             class_teacher = f"{ct.first_name} {ct.last_name or ''}".strip()
-    teachers = (
-        await db.execute(select(Employee).where(
-            Employee.tenant_id == tid, Employee.is_deleted.is_(False),
-            Employee.designation.ilike("%teacher%")))
+
+    assignments = (
+        await db.execute(select(TeacherAssignment).where(
+            TeacherAssignment.tenant_id == tid, TeacherAssignment.is_deleted.is_(False),
+            TeacherAssignment.assignment_status == "active",
+            (TeacherAssignment.grade_id == student.grade_id) | (TeacherAssignment.grade_id.is_(None)),
+            (TeacherAssignment.section_id == student.section_id) | (TeacherAssignment.section_id.is_(None))))
     ).scalars().all()
+    seen: set = set()
+    teacher_rows: list[dict] = []
+    for a in assignments:
+        emp = await db.get(Employee, a.employee_id)
+        if not emp:
+            continue
+        key = (emp.id, a.subject_id)
+        if key in seen:
+            continue
+        seen.add(key)
+        teacher_rows.append({
+            "name": f"{emp.first_name} {emp.last_name or ''}".strip(),
+            "designation": emp.designation,
+            "subject": subjects.get(a.subject_id, "Class Teacher" if not a.subject_id else "—"),
+        })
 
     return {
         "student": {
@@ -514,11 +535,7 @@ async def student_360(
              "status": b.issue_status, "issue_date": _s(b.issue_date), "due_date": _s(b.due_date)}
             for b in book_issues
         ],
-        "teachers": [
-            {"name": f"{t.first_name} {t.last_name or ''}".strip(), "designation": t.designation,
-             "department": t.department}
-            for t in teachers
-        ],
+        "teachers": teacher_rows,
     }
 
 

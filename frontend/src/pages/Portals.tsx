@@ -3,6 +3,8 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { Icon } from "../components/Icon";
 import { PortalShell } from "../components/PortalShell";
 import { api } from "../lib/api";
+import { useBranding } from "../lib/branding";
+import { printMarksheet } from "../lib/print";
 
 const inr = (v?: string | number) => "₹" + Number(v ?? 0).toLocaleString("en-IN");
 
@@ -113,6 +115,7 @@ function AnnouncementsCard({ items }: { items: { title: string; body?: string; d
 
 function Student360View({ childView }: { childView?: boolean }) {
   const { data, isLoading } = useStudentDash();
+  const brand = useBranding();
   if (isLoading) return <div className="text-slate-400">Loading…</div>;
   if (!data) return <div className="text-slate-400">No data.</div>;
 
@@ -170,7 +173,17 @@ function Student360View({ childView }: { childView?: boolean }) {
       </div>
 
       <div className="card overflow-hidden">
-        <div className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-600">Exam Results</div>
+        <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+          <span className="text-sm font-semibold text-slate-600">Exam Results</span>
+          {data.marks.length > 0 && (
+            <button
+              className="btn-ghost px-2.5 py-1 text-xs text-brand-600"
+              onClick={() => printMarksheet(brand.institution_name, data.student as any, data.marks)}
+            >
+              Download Marksheet
+            </button>
+          )}
+        </div>
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
             <tr>

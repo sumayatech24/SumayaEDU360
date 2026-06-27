@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../lib/api";
+import { useBranding } from "../lib/branding";
+import { printMarksheet } from "../lib/print";
 
 const inr = (v?: string | number) => "₹" + Number(v ?? 0).toLocaleString("en-IN");
 
@@ -61,6 +63,7 @@ function Table({ cols, rows }: { cols: [string, string][]; rows: Record<string, 
 
 export function StudentProfile() {
   const { id = "" } = useParams();
+  const branding = useBranding();
   const { data, isLoading } = useQuery({
     queryKey: ["student-profile", id],
     queryFn: async () => (await api.get<any>(`/reports/student-360/${id}`)).data,
@@ -78,7 +81,12 @@ export function StudentProfile() {
         <Link to="/students" className="btn-ghost text-sm">
           ← All students
         </Link>
-        <span className="text-xs text-slate-400">Student 360 Profile</span>
+        <button
+          className="btn-primary text-sm"
+          onClick={() => printMarksheet(branding.institution_name, s, data.marks)}
+        >
+          Download Marksheet
+        </button>
       </div>
 
       {/* Header */}
@@ -114,9 +122,10 @@ export function StudentProfile() {
             <Field label="Religion" value={s.religion} />
             <Field label="Nationality" value={s.nationality} />
             <Field label="Mother Tongue" value={s.mother_tongue} />
-            <Field label="ID / Aadhaar" value={s.id_number} />
+            <Field label={`${s.government_id_type?.toUpperCase() || "Govt ID"} (masked)`} value={s.government_id_masked} />
             <Field label="Phone" value={s.phone} />
             <Field label="Email" value={s.email} />
+            <Field label="Emergency Contact" value={s.emergency_contact_name && `${s.emergency_contact_name} · ${s.emergency_contact_phone || ""}`} />
             <Field label="Previous School" value={s.previous_school} />
           </div>
           <div className="mt-3 border-t border-slate-100 pt-3">
@@ -164,6 +173,13 @@ export function StudentProfile() {
 
         <Section title="Activities" count={data.activities.length}>
           <Table cols={[["name", "Activity"], ["status", "Status"], ["date", "Since"]]} rows={data.activities} />
+        </Section>
+
+        <Section title="Assets Held (Library & Inventory)" count={data.assets?.length ?? 0}>
+          <Table
+            cols={[["type", "Type"], ["name", "Item"], ["quantity", "Qty"], ["status", "Status"], ["due_date", "Due"]]}
+            rows={data.assets ?? []}
+          />
         </Section>
 
         <Section title="Disciplinary Actions" count={data.discipline.length}>

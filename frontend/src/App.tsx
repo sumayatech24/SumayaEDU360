@@ -13,6 +13,7 @@ import { CMS } from "./pages/CMS";
 import { Communication } from "./pages/Communication";
 import { Curriculum } from "./pages/Curriculum";
 import { Dashboard } from "./pages/Dashboard";
+import { EmployeeProfile } from "./pages/EmployeeProfile";
 import { Exams } from "./pages/Exams";
 import { Fees } from "./pages/Fees";
 import { FieldCustomizer } from "./pages/FieldCustomizer";
@@ -99,8 +100,16 @@ function AdminApp() {
         <Route path="/teacher-allocation" element={<TeacherAllocation />} />
         <Route
           path="/employees"
-          element={<ResourcePage entitySlug="employee" permPrefix="employee_hrms" title="Employees / HR" />}
+          element={
+            <ResourcePage
+              entitySlug="employee"
+              permPrefix="employee_hrms"
+              title="Employees / HR"
+              viewPath={(eid) => `/employees/${eid}`}
+            />
+          }
         />
+        <Route path="/employees/:id" element={<EmployeeProfile />} />
         <Route path="/m/:slug" element={<ModulePage />} />
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

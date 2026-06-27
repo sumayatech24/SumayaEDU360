@@ -539,6 +539,108 @@ async def student_360(
     }
 
 
+@router.get("/employee-360/{employee_id}")
+async def employee_360(
+    employee_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Consolidated staff profile: employment, teaching, leave, payroll, assets, docs."""
+    import uuid as _uuid
+
+    from app.models.hr import LeaveRequest, LeaveType, Payroll
+    from app.models.meta import Document
+    from app.models.operations import AssetAssignment, InventoryItem
+    from app.models.people import Employee, TeacherAssignment, TeacherProfile
+
+    emp = await db.get(Employee, _uuid.UUID(employee_id))
+    if not emp or emp.tenant_id != user.tenant_id or emp.is_deleted:
+        raise HTTPException(404, "Employee not found")
+    tid = user.tenant_id
+    grades = await _name_map(db, Grade, tid, lambda g: g.name)
+    sections = await _name_map(db, Section, tid, lambda s: s.name)
+    subjects = await _name_map(db, Subject, tid, lambda s: s.name)
+
+    tp = (await db.execute(select(TeacherProfile).where(
+        TeacherProfile.tenant_id == tid, TeacherProfile.employee_id == emp.id,
+        TeacherProfile.is_deleted.is_(False)))).scalars().first()
+    manager_name = None
+    if tp and tp.reporting_manager_id:
+        m = await db.get(Employee, tp.reporting_manager_id)
+        manager_name = f"{m.first_name} {m.last_name or ''}".strip() if m else None
+
+    assignments = (await db.execute(select(TeacherAssignment).where(
+        TeacherAssignment.tenant_id == tid, TeacherAssignment.employee_id == emp.id,
+        TeacherAssignment.is_deleted.is_(False)))).scalars().all()
+
+    leave_types = (await db.execute(select(LeaveType).where(
+        LeaveType.tenant_id == tid, LeaveType.is_deleted.is_(False)))).scalars().all()
+    leaves = (await db.execute(select(LeaveRequest).where(
+        LeaveRequest.tenant_id == tid, LeaveRequest.employee_id == emp.id,
+        LeaveRequest.is_deleted.is_(False)).order_by(LeaveRequest.from_date.desc()))).scalars().all()
+    taken = {}
+    for l in leaves:
+        if l.request_status == "approved":
+            taken[l.leave_type] = taken.get(l.leave_type, 0) + l.days
+
+    payroll = (await db.execute(select(Payroll).where(
+        Payroll.tenant_id == tid, Payroll.employee_id == emp.id, Payroll.is_deleted.is_(False))
+        .order_by(Payroll.year.desc(), Payroll.month.desc()))).scalars().all()
+
+    item_names = await _name_map(db, InventoryItem, tid, lambda i: i.name)
+    assets = (await db.execute(select(AssetAssignment).where(
+        AssetAssignment.tenant_id == tid, AssetAssignment.employee_id == emp.id,
+        AssetAssignment.assignment_status == "issued", AssetAssignment.is_deleted.is_(False)))).scalars().all()
+
+    docs = (await db.execute(select(Document).where(
+        Document.tenant_id == tid, Document.owner_type == "employee", Document.owner_id == emp.id,
+        Document.is_deleted.is_(False)))).scalars().all()
+
+    return {
+        "employee": {
+            "id": str(emp.id), "employee_no": emp.employee_no,
+            "name": f"{emp.first_name} {emp.last_name or ''}".strip(),
+            "designation": emp.designation, "department": emp.department,
+            "gender": emp.gender, "email": emp.email, "phone": emp.phone, "address": emp.address,
+            "government_id_type": emp.government_id_type,
+            "government_id_masked": _mask_identifier(emp.government_id_number),
+            "date_of_joining": _s(emp.date_of_joining), "employment_type": emp.employment_type,
+            "employment_status": emp.employment_status, "salary": _s(emp.salary),
+            "reporting_manager": manager_name,
+        },
+        "teaching_profile": None if not tp else {
+            "qualification": tp.qualification, "expertise": tp.expertise,
+            "certifications": tp.certifications, "subjects_can_teach": tp.subjects_can_teach,
+        },
+        "classes": [
+            {"grade": grades.get(a.grade_id, "—"), "section": sections.get(a.section_id, "—"),
+             "subject": subjects.get(a.subject_id, "—"), "status": a.assignment_status}
+            for a in assignments
+        ],
+        "leave_balance": [
+            {"type": lt.name, "code": lt.code, "allowance": lt.max_days_per_year,
+             "taken": taken.get(lt.code, 0), "balance": lt.max_days_per_year - taken.get(lt.code, 0)}
+            for lt in leave_types
+        ],
+        "leave_history": [
+            {"type": l.leave_type, "from": _s(l.from_date), "to": _s(l.to_date),
+             "days": l.days, "status": l.request_status}
+            for l in leaves
+        ],
+        "payroll": [
+            {"period": f"{p.month}/{p.year}", "basic": _s(p.basic), "net": _s(p.net_pay),
+             "status": p.payroll_status}
+            for p in payroll
+        ],
+        "assets": [
+            {"name": item_names.get(a.item_id, "—"), "quantity": a.quantity,
+             "status": a.assignment_status, "due_date": _s(a.due_date)}
+            for a in assets
+        ],
+        "documents": [{"name": d.name, "category": d.category, "url": d.url} for d in docs],
+    }
+
+
 @router.get("/run/{key}")
 async def run_report(
     key: str,

@@ -1021,6 +1021,21 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
         # Make this teacher the class teacher of the first section
         if sections:
             sections[0].class_teacher_id = teacher_emp.id
+
+        # A sample approved leave + payroll so the staff profile is populated
+        from app.models import LeaveRequest, Payroll
+
+        await get_or_create(
+            db, LeaveRequest, tenant_id=tid, employee_id=teacher_emp.id, from_date=date(2026, 5, 4),
+            defaults={"leave_type": "CL", "to_date": date(2026, 5, 5), "days": 2,
+                      "reason": "Personal work", "request_status": "approved", "approver_id": principal_emp.id if principal_emp else None},
+        )
+        for mth in (4, 5):
+            await get_or_create(
+                db, Payroll, tenant_id=tid, employee_id=teacher_emp.id, month=mth, year=2026,
+                defaults={"basic": Decimal("45000"), "allowances": Decimal("5000"), "deductions": Decimal("2000"),
+                          "net_pay": Decimal("48000"), "payroll_status": "paid"},
+            )
     roles = {
         c: (await db.execute(select(Role).where(Role.tenant_id == tid, Role.code == c))).scalars().first()
         for c in ("student", "parent", "teacher")

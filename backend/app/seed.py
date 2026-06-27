@@ -314,6 +314,7 @@ CORE_NAV = [
     ("Activities", "trending-up", "/activities", "activities_events", "activities_events:read", 22),
     ("Finance", "credit-card", "/finance", "finance_accounting", "finance_accounting:read", 23),
     ("Store / Inventory", "table", "/store", "finance_accounting", "finance_accounting:read", 24),
+    ("Asset Tracking", "briefcase", "/asset-tracking", "finance_accounting", "finance_accounting:read", 24),
     ("Communication", "activity", "/communication", "ptm_communication", "ptm_communication:read", 25),
     ("Transport", "trending-up", "/transport", "transport", "transport:read", 26),
     ("Timetable", "grid", "/timetable", "timetable_scheduling", "timetable_scheduling:read", 27),

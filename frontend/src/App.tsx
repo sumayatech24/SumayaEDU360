@@ -6,6 +6,7 @@ import { Academic } from "./pages/Academic";
 import { ActivitiesPage } from "./pages/ActivitiesPage";
 import { Admissions } from "./pages/Admissions";
 import { Attendance } from "./pages/Attendance";
+import { AssetTracking } from "./pages/AssetTracking";
 import { Audit } from "./pages/Audit";
 import { Branding } from "./pages/Branding";
 import { CMS } from "./pages/CMS";
@@ -63,6 +64,7 @@ function AdminApp() {
         <Route path="/hr" element={<HR />} />
         <Route path="/finance" element={<Finance />} />
         <Route path="/store" element={<Store />} />
+        <Route path="/asset-tracking" element={<AssetTracking />} />
         <Route path="/homework" element={<HomeworkPage />} />
         <Route path="/activities" element={<ActivitiesPage />} />
         <Route path="/communication" element={<Communication />} />

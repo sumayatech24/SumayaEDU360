@@ -14,9 +14,105 @@ from app.core.database import get_db
 from app.core.deps import CurrentUser, require_permission
 from app.models.academics_ops import Homework, HomeworkSubmission
 from app.models.finance import Expense
-from app.models.operations import Activity, ActivityRegistration, Announcement, InventoryItem, StockMovement
+from app.models.operations import (
+    Activity,
+    ActivityRegistration,
+    Announcement,
+    AssetAssignment,
+    InventoryItem,
+    StockMovement,
+)
+from app.models.people import Employee, Student
 
 router = APIRouter(tags=["Workflows · Ops"])
+
+
+# ----------------------------------------------------------------- Inventory: asset issue / return
+class AssetIssueIn(BaseModel):
+    item_id: uuid.UUID
+    assignee_type: str = "student"  # student / employee
+    student_id: uuid.UUID | None = None
+    employee_id: uuid.UUID | None = None
+    quantity: int = 1
+    due_date: date | None = None
+    remarks: str | None = None
+
+
+@router.get("/inventory/assets")
+async def list_assets(
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_permission("finance_accounting:read")),
+):
+    rows = (await db.execute(select(AssetAssignment).where(
+        AssetAssignment.tenant_id == user.tenant_id, AssetAssignment.is_deleted.is_(False))
+        .order_by(AssetAssignment.created_at.desc()))).scalars().all()
+    out = []
+    for a in rows:
+        item = await db.get(InventoryItem, a.item_id)
+        who = "—"
+        if a.student_id:
+            s = await db.get(Student, a.student_id)
+            who = f"{s.first_name} {s.last_name or ''}".strip() if s else "—"
+        elif a.employee_id:
+            e = await db.get(Employee, a.employee_id)
+            who = f"{e.first_name} {e.last_name or ''}".strip() if e else "—"
+        elif a.location_name:
+            who = a.location_name
+        out.append({
+            "id": str(a.id), "item": item.name if item else "—", "assignee_type": a.assignee_type,
+            "assignee": who, "quantity": a.quantity, "issue_date": a.issue_date.isoformat() if a.issue_date else None,
+            "due_date": a.due_date.isoformat() if a.due_date else None, "status": a.assignment_status,
+        })
+    return out
+
+
+@router.post("/inventory/assets/issue")
+async def issue_asset(
+    payload: AssetIssueIn,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_permission("finance_accounting:create")),
+):
+    item = await db.get(InventoryItem, payload.item_id)
+    if not item or item.tenant_id != user.tenant_id or item.is_deleted:
+        raise HTTPException(404, "Item not found")
+    if payload.quantity <= 0:
+        raise HTTPException(422, "Quantity must be positive")
+    if item.quantity_on_hand < payload.quantity:
+        raise HTTPException(409, "Insufficient stock to issue")
+    asset = AssetAssignment(
+        tenant_id=user.tenant_id, item_id=item.id, assignee_type=payload.assignee_type,
+        student_id=payload.student_id, employee_id=payload.employee_id, quantity=payload.quantity,
+        issue_date=date.today(), due_date=payload.due_date, assignment_status="issued",
+        remarks=payload.remarks, created_by=user.id, updated_by=user.id,
+    )
+    item.quantity_on_hand -= payload.quantity
+    db.add(asset)
+    await db.flush()
+    await record_audit(db, action="issue_asset", entity="AssetAssignment", entity_id=asset.id, actor=user,
+                       changes={"item": item.name, "qty": payload.quantity})
+    return {"id": str(asset.id), "on_hand": item.quantity_on_hand}
+
+
+@router.post("/inventory/assets/{asset_id}/return")
+async def return_asset(
+    asset_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_permission("finance_accounting:update")),
+):
+    asset = await db.get(AssetAssignment, asset_id)
+    if not asset or asset.tenant_id != user.tenant_id or asset.is_deleted:
+        raise HTTPException(404, "Asset assignment not found")
+    if asset.assignment_status == "returned":
+        raise HTTPException(409, "Already returned")
+    asset.assignment_status = "returned"
+    asset.return_date = date.today()
+    asset.updated_by = user.id
+    item = await db.get(InventoryItem, asset.item_id)
+    if item:
+        item.quantity_on_hand += asset.quantity
+    await db.flush()
+    await record_audit(db, action="return_asset", entity="AssetAssignment", entity_id=asset.id, actor=user)
+    return {"id": str(asset.id), "status": "returned", "on_hand": item.quantity_on_hand if item else None}
 
 
 # ----------------------------------------------------------------- Finance: expense approval

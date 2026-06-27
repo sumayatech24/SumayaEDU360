@@ -89,11 +89,36 @@ async def convert_lead(
         phone=lead.phone,
         email=lead.email,
         enrollment_status="enrolled",
+        admission_date=date.today(),
+        # Carry over the application details captured during admission.
+        date_of_birth=lead.date_of_birth,
+        gender=lead.gender,
+        category=lead.category,
+        religion=lead.religion,
+        nationality=lead.nationality,
+        address=lead.address,
+        city=lead.city,
+        state=lead.state,
+        pincode=lead.pincode,
+        previous_school=lead.previous_school,
         created_by=user.id,
         updated_by=user.id,
     )
     db.add(student)
     await db.flush()
+
+    # Create guardian records from the application's parent details.
+    from app.models.people import Guardian
+
+    for relation, name, phone in [("father", lead.father_name, lead.father_phone),
+                                  ("mother", lead.mother_name, lead.mother_phone)]:
+        if name:
+            db.add(Guardian(
+                tenant_id=user.tenant_id, student_id=student.id, relation=relation,
+                full_name=name, phone=phone, is_primary=(relation == "father"),
+                created_by=user.id, updated_by=user.id,
+            ))
+
     lead.converted_student_id = student.id
     lead.stage = "enrolled"
     lead.updated_by = user.id

@@ -658,24 +658,59 @@ function TeacherSubmissions() {
   );
 }
 
+const SCHED_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
 function TeacherSchedule() {
   const { data } = useQuery({
     queryKey: ["portal-teacher-schedule"],
     queryFn: async () => (await api.get<{ classes: any[]; exams: any[] }>("/portal/teacher/schedule")).data,
   });
+  const classes = data?.classes ?? [];
+  const periods = [...new Set(classes.map((c) => c.period_no))].sort((a, b) => a - b);
+  const cell = (day: string, period: number) => classes.find((c) => c.day === day && c.period_no === period);
+
   return (
     <div className="space-y-5">
-      <div className="card overflow-hidden">
-        <div className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-600">Class Schedule</div>
+      <div className="card overflow-x-auto">
+        <div className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-600">Weekly Timetable</div>
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-            <tr><th className="px-4 py-3">Day</th><th className="px-4 py-3">Period</th><th className="px-4 py-3">Class</th><th className="px-4 py-3">Subject</th><th className="px-4 py-3">Time</th></tr>
+            <tr>
+              <th className="px-4 py-3">Period</th>
+              {SCHED_DAYS.map((d) => (
+                <th key={d} className="px-4 py-3">{d.slice(0, 3)}</th>
+              ))}
+            </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {data?.classes.map((c) => (
-              <tr key={c.id}><td className="px-4 py-2.5">{c.day}</td><td className="px-4 py-2.5">{c.period_no}</td><td className="px-4 py-2.5">{c.grade}/{c.section}</td><td className="px-4 py-2.5">{c.subject}</td><td className="px-4 py-2.5">{c.start_time || "--"} - {c.end_time || "--"}</td></tr>
+            {periods.map((p) => (
+              <tr key={p}>
+                <td className="px-4 py-3 font-medium text-slate-500">P{p}</td>
+                {SCHED_DAYS.map((d) => {
+                  const c = cell(d, p);
+                  return (
+                    <td key={d} className="px-2 py-2 align-top">
+                      {c ? (
+                        <div className="rounded-lg bg-orange-50 px-2.5 py-1.5">
+                          <div className="text-xs font-semibold text-orange-700">{c.subject}</div>
+                          <div className="text-[11px] text-slate-500">{c.grade}/{c.section}{c.room ? ` · ${c.room}` : ""}</div>
+                          {c.start_time && <div className="text-[10px] text-slate-400">{c.start_time}–{c.end_time}</div>}
+                        </div>
+                      ) : (
+                        <span className="text-slate-200">—</span>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
             ))}
-            {(!data?.classes || data.classes.length === 0) && <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">No classes scheduled.</td></tr>}
+            {periods.length === 0 && (
+              <tr>
+                <td colSpan={SCHED_DAYS.length + 1} className="px-4 py-8 text-center text-slate-400">
+                  No timetable periods assigned yet.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

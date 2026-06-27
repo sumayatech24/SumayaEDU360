@@ -310,7 +310,25 @@ class EmployeeOut(AuditedOut, EmployeeBase):
 
 
 # ----------------------------------------------------------------------------- Admissions
-class AdmissionLeadBase(_C):
+class _AdmissionApp(_C):
+    date_of_birth: date | None = None
+    gender: str | None = None
+    category: str | None = None
+    religion: str | None = None
+    nationality: str | None = None
+    address: str | None = None
+    city: str | None = None
+    state: str | None = None
+    pincode: str | None = None
+    father_name: str | None = None
+    father_phone: str | None = None
+    mother_name: str | None = None
+    mother_phone: str | None = None
+    previous_school: str | None = None
+    documents: list | None = None
+
+
+class AdmissionLeadBase(_AdmissionApp):
     lead_no: str
     student_name: str
     guardian_name: str | None = None
@@ -329,7 +347,7 @@ class AdmissionLeadCreate(AdmissionLeadBase):
     pass
 
 
-class AdmissionLeadUpdate(_C):
+class AdmissionLeadUpdate(_AdmissionApp):
     student_name: str | None = None
     guardian_name: str | None = None
     phone: str | None = None

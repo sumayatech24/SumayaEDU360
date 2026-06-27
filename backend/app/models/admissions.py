@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import Date, ForeignKey, String, Text
+from sqlalchemy import JSON, Date, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -26,5 +26,24 @@ class AdmissionLead(BaseEntity, Base):
     follow_up_date: Mapped["Date"] = mapped_column(Date, nullable=True)
     test_score: Mapped[str | None] = mapped_column(String(50), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Full application details (carried over to the Student on enrollment)
+    date_of_birth: Mapped["Date"] = mapped_column(Date, nullable=True)
+    gender: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    category: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    religion: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    nationality: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    city: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    state: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    pincode: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    father_name: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    father_phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    mother_name: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    mother_phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    previous_school: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # [{name, data}] — uploaded document data URIs (birth cert, TC, photo, ...)
+    documents: Mapped[list | None] = mapped_column(JSON, nullable=True)
+
     # Set once converted to a Student
     converted_student_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)

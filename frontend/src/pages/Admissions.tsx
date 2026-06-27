@@ -31,10 +31,18 @@ const NEXT: Record<string, string> = {
   approved: "enrolled",
 };
 
+const EMPTY_APP = {
+  student_name: "", phone: "", email: "", source: "website", grade_applied_id: "",
+  date_of_birth: "", gender: "", category: "", religion: "", previous_school: "",
+  address: "", city: "", state: "", pincode: "",
+  father_name: "", father_phone: "", mother_name: "", mother_phone: "",
+};
+
 export function Admissions() {
   const qc = useQueryClient();
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ student_name: "", phone: "", source: "website" });
+  const [form, setForm] = useState({ ...EMPTY_APP });
+  const [documents, setDocuments] = useState<{ name: string; data: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const { data } = useQuery({
@@ -42,7 +50,22 @@ export function Admissions() {
     queryFn: async () =>
       (await api.get<Page<Lead>>("/admission-leads", { params: { page_size: 200 } })).data,
   });
+  const { data: grades } = useQuery({
+    queryKey: ["grades-pick"],
+    queryFn: async () => (await api.get<Page<any>>("/grades", { params: { page_size: 100 } })).data,
+  });
   const leads = data?.items ?? [];
+
+  function onDocFile(file?: File) {
+    if (!file) return;
+    if (file.size > 500_000) {
+      setError("Each document must be under 500 KB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setDocuments((d) => [...d, { name: file.name, data: String(reader.result) }]);
+    reader.readAsDataURL(file);
+  }
 
   const advance = useMutation({
     mutationFn: async ({ id, stage }: { id: string; stage: string }) =>
@@ -64,16 +87,18 @@ export function Admissions() {
       const count = leads.length + 1;
       return api.post("/admission-leads", {
         lead_no: `LEAD-${String(count).padStart(4, "0")}-${Date.now() % 1000}`,
-        student_name: form.student_name,
-        phone: form.phone,
-        source: form.source,
         stage: "inquiry",
+        ...form,
+        grade_applied_id: form.grade_applied_id || null,
+        date_of_birth: form.date_of_birth || null,
+        documents,
       });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admission-leads-board"] });
       setCreating(false);
-      setForm({ student_name: "", phone: "", source: "website" });
+      setForm({ ...EMPTY_APP });
+      setDocuments([]);
       setError(null);
     },
     onError: (e) => setError(apiError(e)),
@@ -151,40 +176,84 @@ export function Admissions() {
       </div>
 
       {creating && (
-        <Modal title="New Admission Inquiry" onClose={() => setCreating(false)}>
+        <Modal wide title="New Admission Application" onClose={() => setCreating(false)}>
           <div className="space-y-4">
-            <div>
-              <label className="label">Student Name *</label>
-              <input
-                className="input"
-                value={form.student_name}
-                onChange={(e) => setForm({ ...form, student_name: e.target.value })}
-              />
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Applicant</div>
+            <div className="grid grid-cols-3 gap-3">
+              <F label="Student Name *" v={form.student_name} set={(v) => setForm({ ...form, student_name: v })} />
+              <div>
+                <label className="label">Class Applied</label>
+                <select className="input" value={form.grade_applied_id} onChange={(e) => setForm({ ...form, grade_applied_id: e.target.value })}>
+                  <option value="">— select —</option>
+                  {grades?.items?.map((g: any) => (
+                    <option key={g.id} value={g.id}>{g.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label">Gender</label>
+                <select className="input" value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
+                  <option value="">—</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="label">Date of Birth</label>
+                <input type="date" className="input" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} />
+              </div>
+              <F label="Category" v={form.category} set={(v) => setForm({ ...form, category: v })} />
+              <F label="Religion" v={form.religion} set={(v) => setForm({ ...form, religion: v })} />
+              <F label="Phone" v={form.phone} set={(v) => setForm({ ...form, phone: v })} />
+              <F label="Email" v={form.email} set={(v) => setForm({ ...form, email: v })} />
+              <F label="Previous School" v={form.previous_school} set={(v) => setForm({ ...form, previous_school: v })} />
             </div>
-            <div>
-              <label className="label">Phone</label>
-              <input
-                className="input"
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              />
+
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Address</div>
+            <div className="grid grid-cols-4 gap-3">
+              <div className="col-span-2"><F label="Address" v={form.address} set={(v) => setForm({ ...form, address: v })} /></div>
+              <F label="City" v={form.city} set={(v) => setForm({ ...form, city: v })} />
+              <F label="Pincode" v={form.pincode} set={(v) => setForm({ ...form, pincode: v })} />
             </div>
+
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Parents / Guardians</div>
+            <div className="grid grid-cols-4 gap-3">
+              <F label="Father Name" v={form.father_name} set={(v) => setForm({ ...form, father_name: v })} />
+              <F label="Father Phone" v={form.father_phone} set={(v) => setForm({ ...form, father_phone: v })} />
+              <F label="Mother Name" v={form.mother_name} set={(v) => setForm({ ...form, mother_name: v })} />
+              <F label="Mother Phone" v={form.mother_phone} set={(v) => setForm({ ...form, mother_phone: v })} />
+            </div>
+
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Documents</div>
+            <div>
+              <input type="file" accept="image/*,application/pdf" className="text-sm" onChange={(e) => onDocFile(e.target.files?.[0])} />
+              <div className="mt-2 flex flex-wrap gap-2">
+                {documents.map((d, i) => (
+                  <span key={i} className="badge bg-slate-100 text-slate-600">
+                    {d.name}
+                    <button className="ml-1 text-red-500" onClick={() => setDocuments(documents.filter((_, j) => j !== i))}>✕</button>
+                  </span>
+                ))}
+              </div>
+            </div>
+
             {error && <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
             <div className="flex justify-end gap-2">
-              <button className="btn-ghost" onClick={() => setCreating(false)}>
-                Cancel
-              </button>
-              <button
-                className="btn-primary"
-                disabled={!form.student_name || create.isPending}
-                onClick={() => create.mutate()}
-              >
-                Create
+              <button className="btn-ghost" onClick={() => setCreating(false)}>Cancel</button>
+              <button className="btn-primary" disabled={!form.student_name || create.isPending} onClick={() => create.mutate()}>
+                Submit Application
               </button>
             </div>
           </div>
         </Modal>
       )}
+    </div>
+  );
+}
+
+function F({ label, v, set }: { label: string; v: string; set: (v: string) => void }) {
+  return (
+    <div>
+      <label className="label">{label}</label>
+      <input className="input" value={v} onChange={(e) => set(e.target.value)} />
     </div>
   );
 }

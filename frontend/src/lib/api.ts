@@ -4,6 +4,7 @@ const baseURL =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) || "http://localhost:8000";
 
 export const api = axios.create({ baseURL: `${baseURL}/api/v1` });
+export const publicApi = axios.create({ baseURL: `${baseURL}/api/v1` });
 
 const TOKEN_KEY = "eduos_token";
 
@@ -25,7 +26,11 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err?.response?.status === 401 && !location.pathname.startsWith("/login")) {
+    if (
+      err?.response?.status === 401 &&
+      !location.pathname.startsWith("/login") &&
+      !location.pathname.startsWith("/apply/")
+    ) {
       setToken(null);
       location.href = "/login";
     }

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
+import { DocumentUpload } from "../components/DocumentUpload";
 import { api } from "../lib/api";
 
 const inr = (v?: string | number) => "₹" + Number(v ?? 0).toLocaleString("en-IN");
@@ -127,8 +128,8 @@ export function EmployeeProfile() {
           <Table cols={[["name", "Item"], ["quantity", "Qty"], ["status", "Status"], ["due_date", "Due"]]} rows={data.assets} />
         </Section>
 
-        <Section title="Documents" count={data.documents.length}>
-          <Table cols={[["name", "Document"], ["category", "Category"]]} rows={data.documents} />
+        <Section title="Documents">
+          <DocumentUpload ownerType="employee" ownerId={id} />
         </Section>
       </div>
     </div>

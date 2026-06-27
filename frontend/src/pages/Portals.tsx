@@ -5,6 +5,7 @@ import { PortalShell } from "../components/PortalShell";
 import { api } from "../lib/api";
 import { useBranding } from "../lib/branding";
 import { printMarksheet } from "../lib/print";
+import { ContinuingAdmission } from "./ContinuingAdmission";
 
 const inr = (v?: string | number) => "₹" + Number(v ?? 0).toLocaleString("en-IN");
 
@@ -456,6 +457,7 @@ export function StudentPortal() {
         { label: "Homework", icon: "edit", to: "homework" },
         { label: "Timetable", icon: "table", to: "timetable" },
         { label: "Activities", icon: "activity", to: "activities" },
+        { label: "Next Admission", icon: "school", to: "admission" },
         { label: "Profile", icon: "users", to: "profile" },
       ]}
     >
@@ -464,6 +466,7 @@ export function StudentPortal() {
         <Route path="homework" element={<HomeworkList />} />
         <Route path="timetable" element={<TimetableView />} />
         <Route path="activities" element={<ActivitiesView />} />
+        <Route path="admission" element={<ContinuingAdmission />} />
         <Route path="profile" element={<GuardiansResults />} />
         <Route path="*" element={<Navigate to="" replace />} />
       </Routes>

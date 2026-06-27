@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../lib/api";
+import { DocumentUpload } from "../components/DocumentUpload";
 import { useBranding } from "../lib/branding";
 import { printMarksheet } from "../lib/print";
 
@@ -180,6 +181,10 @@ export function StudentProfile() {
             cols={[["type", "Type"], ["name", "Item"], ["quantity", "Qty"], ["status", "Status"], ["due_date", "Due"]]}
             rows={data.assets ?? []}
           />
+        </Section>
+
+        <Section title="Documents">
+          <DocumentUpload ownerType="student" ownerId={id} />
         </Section>
 
         <Section title="Disciplinary Actions" count={data.discipline.length}>

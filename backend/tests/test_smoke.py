@@ -129,13 +129,19 @@ async def test_teacher_schedule_and_roster_are_assignment_backed(client):
 async def test_marksheet_lifecycle_and_student_visibility(client):
     admin = await _login(client, "admin@sumaya.edu", "Admin@123")
     exams = (await client.get("/api/v1/exams", headers=admin)).json()["items"]
-    subjects = (await client.get("/api/v1/subjects", headers=admin)).json()["items"]
     grades = (await client.get("/api/v1/grades", headers=admin)).json()["items"]
     sections = (await client.get("/api/v1/sections", headers=admin)).json()["items"]
     exam_id = exams[0]["id"]
-    subject_id = subjects[-1]["id"]
-    grade_id = grades[0]["id"]
-    section_id = sections[0]["id"]
+    section = sections[0]
+    grade_id = section["grade_id"]
+    section_id = section["id"]
+    subject_create = await client.post(
+        "/api/v1/subjects",
+        headers=admin,
+        json={"name": "Workflow Test Subject", "code": "WF-TEST", "grade_id": grade_id},
+    )
+    assert subject_create.status_code == 201, subject_create.text
+    subject_id = subject_create.json()["id"]
 
     sheet = await client.get(
         f"/api/v1/exams/{exam_id}/marks-sheet",
@@ -186,3 +192,137 @@ async def test_marksheet_lifecycle_and_student_visibility(client):
     assert dash.status_code == 200, dash.text
     assert dash.json()["marks"]
     assert dash.json()["assets"]
+
+
+@pytest.mark.asyncio
+async def test_complete_new_admission_lifecycle(client):
+    config = (await client.get("/api/v1/public/admissions/SUMAYA/config")).json()
+    grade = config["grades"][0]
+    year = next((y for y in config["academic_years"] if y["is_current"]), config["academic_years"][0])
+    register = await client.post(
+        "/api/v1/public/admissions/SUMAYA/register",
+        json={
+            "email": "applicant.flow@example.com", "password": "Applicant@123",
+            "full_name": "Flow Test Parent", "phone": "9999999901",
+        },
+    )
+    assert register.status_code == 200, register.text
+    applicant_headers = {"Authorization": f"Bearer {register.json()['access_token']}"}
+    submit = await client.post(
+        "/api/v1/public/admissions/SUMAYA/applications",
+        headers=applicant_headers,
+        json={
+            "student_name": "Admission Flow Child", "grade_applied_id": grade["id"],
+            "academic_year_id": year["id"], "phone": "9999999901",
+            "date_of_birth": "2017-05-10", "father_name": "Flow Test Parent",
+            "declaration_accepted": True,
+            "documents": [
+                {"document_type": "birth_certificate", "file_name": "birth.pdf", "file_data": "data:test"},
+                {"document_type": "student_photo", "file_name": "photo.jpg", "file_data": "data:test"},
+            ],
+        },
+    )
+    assert submit.status_code == 201, submit.text
+    application = submit.json()
+    assert application["status"] == "submitted"
+
+    admin = await _login(client, "admin@sumaya.edu", "Admin@123")
+    for check in application["checks"]:
+        response = await client.post(
+            f"/api/v1/admissions/applications/{application['id']}/checks/{check['id']}",
+            headers=admin, json={"status": "verified"},
+        )
+        assert response.status_code == 200, response.text
+        application = response.json()
+    for document in application["documents"]:
+        response = await client.post(
+            f"/api/v1/admissions/applications/{application['id']}/documents/{document['id']}",
+            headers=admin, json={"status": "verified"},
+        )
+        assert response.status_code == 200, response.text
+        application = response.json()
+    assert application["verification_status"] == "verified"
+    sections = (await client.get("/api/v1/sections", headers=admin)).json()["items"]
+    section = next(s for s in sections if s["grade_id"] == grade["id"])
+    placement = await client.post(
+        f"/api/v1/admissions/applications/{application['id']}/placement",
+        headers=admin,
+        json={"academic_year_id": year["id"], "grade_id": grade["id"], "section_id": section["id"]},
+    )
+    assert placement.status_code == 200, placement.text
+    decision = await client.post(
+        f"/api/v1/admissions/applications/{application['id']}/decision",
+        headers=admin, json={"decision": "approved", "notes": "All checks complete"},
+    )
+    assert decision.status_code == 200, decision.text
+    charge = await client.post(
+        f"/api/v1/admissions/applications/{application['id']}/charges",
+        headers=admin, json={"charge_type": "admission_fee", "amount": "15000"},
+    )
+    assert charge.status_code == 201, charge.text
+    charge_id = charge.json()["charges"][0]["id"]
+    payment = await client.post(
+        f"/api/v1/admissions/applications/{application['id']}/charges/{charge_id}/pay",
+        headers=admin, json={"amount": "15000", "method": "upi", "reference": "UPI-TEST-1"},
+    )
+    assert payment.status_code == 200, payment.text
+    assert payment.json()["fee_status"] == "paid"
+    enroll = await client.post(
+        f"/api/v1/admissions/applications/{application['id']}/enroll", headers=admin,
+    )
+    assert enroll.status_code == 200, enroll.text
+    assert enroll.json()["admission_no"].startswith("ADM")
+
+
+@pytest.mark.asyncio
+async def test_continuing_student_applies_from_internal_portal(client):
+    student_headers = await _login(client, "student@sumaya.edu", "Student@123")
+    admin = await _login(client, "admin@sumaya.edu", "Admin@123")
+    config = (await client.get("/api/v1/public/admissions/SUMAYA/config")).json()
+    year = next((y for y in config["academic_years"] if y["is_current"]), config["academic_years"][0])
+    target_grade = config["grades"][-1]
+    submit = await client.post(
+        "/api/v1/admissions/internal/applications",
+        headers=student_headers,
+        json={"target_grade_id": target_grade["id"], "academic_year_id": year["id"],
+              "notes": "Apply for the next academic year"},
+    )
+    assert submit.status_code == 201, submit.text
+    application = submit.json()
+    assert application["application_type"] == "continuing"
+    assert application["channel"] == "internal"
+    mine = await client.get("/api/v1/admissions/my-applications", headers=student_headers)
+    assert mine.status_code == 200
+    assert any(a["id"] == application["id"] for a in mine.json())
+
+    for check in application["checks"]:
+        response = await client.post(
+            f"/api/v1/admissions/applications/{application['id']}/checks/{check['id']}",
+            headers=admin, json={"status": "verified"},
+        )
+        assert response.status_code == 200, response.text
+        application = response.json()
+    assert application["verification_status"] == "verified"
+    decision = await client.post(
+        f"/api/v1/admissions/applications/{application['id']}/decision",
+        headers=admin, json={"decision": "approved", "notes": "Continuation cleared"},
+    )
+    assert decision.status_code == 200, decision.text
+    charge = await client.post(
+        f"/api/v1/admissions/applications/{application['id']}/charges",
+        headers=admin, json={"charge_type": "continuation_fee", "amount": "1000"},
+    )
+    assert charge.status_code == 201, charge.text
+    charge_id = charge.json()["charges"][0]["id"]
+    paid = await client.post(
+        f"/api/v1/admissions/applications/{application['id']}/charges/{charge_id}/pay",
+        headers=admin, json={"amount": "1000", "method": "cash"},
+    )
+    assert paid.status_code == 200, paid.text
+    enrolled = await client.post(
+        f"/api/v1/admissions/applications/{application['id']}/enroll", headers=admin,
+    )
+    assert enrolled.status_code == 200, enrolled.text
+    students = (await client.get("/api/v1/students", headers=admin)).json()["items"]
+    promoted = next(s for s in students if s["id"] == enrolled.json()["student_id"])
+    assert promoted["grade_id"] == target_grade["id"]

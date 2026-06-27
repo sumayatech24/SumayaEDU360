@@ -10,6 +10,49 @@ Three implementation tiers:
 
 Every tier saves to PostgreSQL with tenant isolation, RBAC and audit.
 
+## Delivery audit — 28 June 2026
+
+The earlier table used **Workflow** too generously: a page with one state-change button is
+not the same as an operationally complete module. The codebase is now re-baselined with
+four delivery states:
+
+- **End-to-end** — distinct user surfaces, durable domain data, guarded transitions,
+  operational workbench, and tested completion path.
+- **Functional partial** — useful typed data and one or more workflows exist, but major
+  business processes, controls, or exception paths are still absent.
+- **CRUD / thin screen** — records can be maintained, but the module is primarily a form
+  or generated table rather than a complete business process.
+- **Not implemented** — metadata, configuration placeholders, or no product surface.
+
+| Priority | Module | Audited state | Main gaps / next delivery slice |
+|---|---|---|---|
+| Done first | Admissions CRM | **End-to-end** | Public applicant login/form/tracking; internal continuation application; per-document and eligibility verification; decision; class/section allocation; pre-enrollment fee/receipt; new enrollment or existing-student promotion; capacity guard. |
+| P1 | Academic Configuration | CRUD / thin screen | Admission windows, class capacity planning, terms/calendars, subject-class mapping rules, rollover controls. |
+| P1 | Fees & Billing | Functional partial | Fee-plan components UI, bulk invoice generation, concessions/scholarships, overdue rules, refunds, online payment reconciliation, cashier close. |
+| P1 | Student Information System | Functional partial | Transfer/withdrawal/TC, re-enrollment, document vault, medical/consent records, alumni lifecycle, duplicate/merge controls. |
+| P1 | Examination + Report Cards | Functional partial | Exam schemes, grading rules, moderation, absent/retest handling, consolidated report publishing, transcript history. |
+| P1 | Attendance | Functional partial | Timetable-backed sessions, leave/late/half-day rules, correction approval, parent alerts, monthly lock. |
+| P2 | Teacher Management | CRUD / thin screen | Recruitment/onboarding, qualifications and compliance, workload planning, substitute allocation, appraisal. |
+| P2 | Employee HRMS | Functional partial | Attendance/shift linkage, leave balances/policies, payroll components/statutory deductions, approval and payslip cycle. |
+| P2 | Timetable & Scheduling | CRUD / thin screen | Conflict detection, room/resource constraints, substitution, publish/version workflow. |
+| P2 | Homework & Assignments | Functional partial | Rubrics, attachments, late/resubmission rules, class-wide grading workbench, notifications. |
+| P2 | Library Management | Functional partial | Reservation/renewal, member limits, fine collection/waiver, acquisition, stock verification, lost/damaged flow. |
+| P2 | Transport | CRUD / thin screen | Route planning, stop allocation, capacity, driver trips, attendance, GPS/events, transport billing. |
+| P2 | Hostel | Functional partial | Bed-level allocation, visitor/gate pass, hostel attendance, mess/fee linkage, incidents. |
+| P2 | Finance / Store / Assets | Functional partial | Double-entry posting, budgets, approvals, GRN/vendor bills; purchase-to-stock; asset maintenance/depreciation/disposal. |
+| P3 | Parent / Student / Teacher portals | Functional partial | Notifications/inbox, requests and approvals, consent, appointments, richer self-service and mobile-responsive workflow coverage. |
+| P3 | Curriculum, Question Bank, Learning Repository | CRUD / thin screen | Curriculum mapping, coverage monitoring, blueprint/paper assembly, review/publish/versioning. |
+| P3 | Meals, Activities, PTM, Communication, CMS, Knowledge | CRUD / thin screen or functional partial | Each needs planning, approvals, booking/capacity, payments where relevant, notifications, publication and exception handling. |
+| P3 | Dashboards & Analytics | Functional partial | KPI definitions, saved dashboards, drill-through, scheduled reports, data-quality monitoring. |
+| P3 | Security & Compliance | Functional partial | Approval policies, segregation of duties, session/device controls, retention/export, security events. |
+| P4 | Integrations | Not implemented | Current screen stores toggles only; provider credentials, webhooks, retries, logs, reconciliation and health checks are absent. |
+| P4 | AI Copilots | Not implemented | Retrieval, safe tools, prompt/config governance, evaluation, usage/cost controls and audit. |
+| P4 | Mobile Apps | Not implemented | Native delivery remains separate; API/portal readiness alone is not a mobile app. |
+| P4 | Administration & Workflow | Not implemented | Generic metadata records only; needs workflow definitions, approval routing, inbox, SLA/escalation and history. |
+
+The next module should be selected from P1 and completed to the same standard as
+Admissions rather than expanding all modules horizontally.
+
 | # | Module | Tier | Notes |
 |---|--------|------|-------|
 | M001 | Public Website & CMS | **Workflow** | Bespoke screen: pages (Publish/Unpublish) + banners |

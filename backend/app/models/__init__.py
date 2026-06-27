@@ -8,7 +8,14 @@ from app.models.academic import (  # noqa: F401
     Subject,
     Topic,
 )
-from app.models.admissions import AdmissionLead  # noqa: F401
+from app.models.admissions import (  # noqa: F401
+    AdmissionApplicant,
+    AdmissionApplication,
+    AdmissionCharge,
+    AdmissionDocument,
+    AdmissionLead,
+    AdmissionVerification,
+)
 from app.models.attendance import Attendance  # noqa: F401
 from app.models.auth import (  # noqa: F401
     Permission,
@@ -95,7 +102,8 @@ from app.models.transport import (  # noqa: F401
 
 __all__ = [
     "AcademicYear", "Grade", "Program", "Section", "Semester", "Subject", "Topic",
-    "AdmissionLead", "Attendance",
+    "AdmissionLead", "AdmissionApplicant", "AdmissionApplication", "AdmissionCharge",
+    "AdmissionDocument", "AdmissionVerification", "Attendance",
     "Permission", "Role", "RolePermission", "User", "UserRole",
     "Exam", "ExamSubject", "Marks", "MarksBatch", "QuestionPaper",
     "FeePlan", "FeePlanComponent", "Invoice", "Payment",

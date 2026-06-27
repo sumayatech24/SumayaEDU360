@@ -30,6 +30,7 @@ import { Meals } from "./pages/Meals";
 import { ModulePage } from "./pages/ModulePage";
 import { ParentPortal as ParentPortalAdmin } from "./pages/ParentPortal";
 import { ParentPortal, StudentPortal, TeacherPortal } from "./pages/Portals";
+import { PublicAdmission } from "./pages/PublicAdmission";
 import { Promotion } from "./pages/Promotion";
 import { QuestionBank } from "./pages/QuestionBank";
 import { Reports } from "./pages/Reports";
@@ -122,6 +123,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/apply/:tenantCode" element={<PublicAdmission />} />
       <Route path="/student/*" element={<Guard need="student"><StudentPortal /></Guard>} />
       <Route path="/parent/*" element={<Guard need="parent"><ParentPortal /></Guard>} />
       <Route path="/teacher/*" element={<Guard need="teacher"><TeacherPortal /></Guard>} />

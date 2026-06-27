@@ -194,5 +194,5 @@ class Document(BaseEntity, Base):
     owner_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     category: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    url: Mapped[str | None] = mapped_column(Text, nullable=True)  # external URL or data URI
     mime_type: Mapped[str | None] = mapped_column(String(100), nullable=True)

@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { api, apiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useBranding } from "../lib/branding";
-import { endpointFor, rowLabel } from "../lib/resources";
+import { endpointFor, fetchAllPages, rowLabel } from "../lib/resources";
 import { exportCsv, exportExcel, exportPdf, type ExportColumn, type ExportRow } from "../lib/export";
 import type { EntityDef, FieldDef, Page } from "../lib/types";
 import { EntityForm } from "./EntityForm";
@@ -36,10 +36,10 @@ function useDisplayMaps(listFields: FieldDef[]) {
       const ent = refEntities[i].data;
       const ep = ent ? endpointFor(ent) : null;
       return {
-        queryKey: ["ref-options", slug],
+        queryKey: ["ref-options-all", slug],
         enabled: !!ep,
         staleTime: 5 * 60_000,
-        queryFn: async () => (await api.get<Page<any>>(ep!.base, { params: { page_size: 500 } })).data,
+        queryFn: async () => fetchAllPages(ep!.base, { max: 1000 }),
       };
     }),
   });
@@ -57,7 +57,7 @@ function useDisplayMaps(listFields: FieldDef[]) {
     refSlugs.forEach((slug, i) => {
       const ent = refEntities[i].data;
       const map: Record<string, string> = {};
-      (refCollections[i].data?.items ?? []).forEach((row: any) => {
+      (refCollections[i].data ?? []).forEach((row: any) => {
         map[row.id] = rowLabel(ent, row);
       });
       refs[slug] = map;
@@ -173,8 +173,7 @@ export function ResourcePage({ entitySlug, permPrefix, title, hideCreate, rowAct
     setExporting(true);
     try {
       // Pull the full (filtered) result set, not just the visible page.
-      const { data } = await api.get<Page<any>>(ep.base, { params: { page_size: 1000, q: q || undefined } });
-      const items = data.items ?? [];
+      const items = await fetchAllPages(ep.base, { q, max: 5000 });
       const columns: ExportColumn[] = listFields.map((f) => ({ key: f.name, label: f.label }));
       const rows: ExportRow[] = items.map((it: any) => {
         const d = rowData(it);

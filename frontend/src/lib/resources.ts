@@ -1,4 +1,24 @@
-import type { EntityDef } from "./types";
+import { api } from "./api";
+import type { EntityDef, Page } from "./types";
+
+/** Fetch every row of a collection, respecting the API's 200/page cap by
+ *  walking pages until exhausted (or `max` rows, to bound cost). */
+export async function fetchAllPages(
+  base: string,
+  opts: { q?: string; max?: number } = {},
+): Promise<any[]> {
+  const max = opts.max ?? 2000;
+  const pageSize = 200;
+  const items: any[] = [];
+  for (let page = 1; page <= Math.ceil(max / pageSize) + 1; page++) {
+    const { data } = await api.get<Page<any>>(base, {
+      params: { page, page_size: pageSize, q: opts.q || undefined },
+    });
+    items.push(...(data.items ?? []));
+    if (!data.pages || page >= data.pages || items.length >= max) break;
+  }
+  return items;
+}
 
 // Map a typed entity's backing table to its dedicated REST collection path.
 const TYPED_PATHS: Record<string, string> = {

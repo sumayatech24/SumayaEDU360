@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { apiError, publicApi } from "../lib/api";
+import { PublicFooter, PublicHeader, usePublicSite } from "./public/PublicSite";
 
 type Config = {
   institution_name: string;
@@ -104,10 +105,10 @@ export function PublicAdmission() {
     } catch (e) { setError(apiError(e)); } finally { setBusy(false); }
   }
 
-  if (!config) return <PublicFrame><p className="text-slate-500">{error || "Loading admissions portal…"}</p></PublicFrame>;
+  if (!config) return <PublicFrame tenantCode={tenantCode}><p className="text-slate-500">{error || "Loading admissions portal…"}</p></PublicFrame>;
 
   if (!token) return (
-    <PublicFrame>
+    <PublicFrame tenantCode={tenantCode}>
       <div className="mx-auto max-w-md card p-7">
         <div className="mb-6">
           <div className="text-xs font-semibold uppercase tracking-widest text-brand-600">Online admissions</div>
@@ -136,7 +137,7 @@ export function PublicAdmission() {
   );
 
   return (
-    <PublicFrame>
+    <PublicFrame tenantCode={tenantCode}>
       <div className="mx-auto max-w-6xl space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><div className="text-xs font-semibold uppercase tracking-widest text-brand-600">Applicant portal</div><h1 className="text-2xl font-semibold">{config.institution_name}</h1></div>
@@ -211,7 +212,16 @@ function ApplicationCard({ app }: { app: Application }) {
   </div>;
 }
 
-function PublicFrame({ children }: { children: React.ReactNode }) { return <div className="min-h-full bg-gradient-to-br from-slate-50 via-white to-brand-50 px-4 py-10">{children}</div>; }
+function PublicFrame({ tenantCode, children }: { tenantCode: string; children: React.ReactNode }) {
+  const { data } = usePublicSite(tenantCode);
+  return (
+    <div className="flex min-h-full flex-col bg-gradient-to-br from-slate-50 via-white to-brand-50">
+      <PublicHeader data={data} siteCode={tenantCode} />
+      <main className="flex-1 px-4 py-10">{children}</main>
+      <PublicFooter data={data} />
+    </div>
+  );
+}
 function Section({ title, children }: { title: string; children: React.ReactNode }) { return <div className="mb-5"><h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">{title}</h3><div className="grid gap-3 md:grid-cols-4">{children}</div></div>; }
 function Field({ label, value, onChange, type = "text" }: { label: string; value: string; onChange: (v: string) => void; type?: string }) { return <label><span className="label">{label}</span><input className="input" type={type} value={value} onChange={(e) => onChange(e.target.value)} /></label>; }
 function Select({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: { id: string; name: string }[] }) { return <label><span className="label">{label}</span><select className="input" value={value} onChange={(e) => onChange(e.target.value)}><option value="">— select —</option>{options.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</select></label>; }

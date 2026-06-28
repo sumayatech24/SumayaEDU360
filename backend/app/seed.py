@@ -634,14 +634,30 @@ async def seed() -> None:
                 defaults={"label": label, "icon": icon, "module_slug": mslug,
                           "permission_code": perm, "sort_order": order},
             )
+        # Modules with dedicated workflow screens must not also appear as a second,
+        # generic CRUD module. Keeping both made completed work look detached from
+        # the base ERP.
+        dedicated_modules = {
+            "public_website_cms", "admissions_crm", "student_information_system",
+            "parent_guardian_portal", "teacher_management", "employee_hrms",
+            "academic_configuration", "curriculum_lesson_planning",
+            "timetable_scheduling", "attendance", "homework_assignments",
+            "examination_management", "question_paper_management",
+            "report_cards_transcripts", "library_management",
+            "digital_learning_repository", "fees_billing", "finance_accounting",
+            "meal_cafeteria", "transport", "hostel", "activities_events",
+            "ptm_communication", "knowledge_base", "dashboards_analytics",
+            "security_compliance", "integrations",
+        }
         # One catch-all nav entry per remaining module -> generic module page.
         for i, (slug, mod) in enumerate(module_by_slug.items()):
             path = f"/m/{slug}"
-            await get_or_create(
+            item, _ = await get_or_create(
                 db, MenuItem, tenant_id=tid, path=path,
                 defaults={"label": mod.name, "icon": mod.icon, "module_slug": slug,
                           "permission_code": f"{slug}:read", "sort_order": 200 + i},
             )
+            item.is_enabled = slug not in dedicated_modules
 
         # ---------------------------------------------------------------- settings
         _logo = (

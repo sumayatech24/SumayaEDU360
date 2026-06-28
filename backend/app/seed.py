@@ -463,6 +463,11 @@ async def seed() -> None:
             sa = role_by_code.get("super_admin")
             if sa:
                 await get_or_create(db, UserRole, user_id=admin.id, role_id=sa.id)
+        else:
+            # Keep the documented bootstrap login usable on existing local databases.
+            admin.hashed_password = hash_password(settings.SEED_ADMIN_PASSWORD)
+            admin.is_active = True
+            admin.is_superadmin = True
 
         # ---------------------------------------------------------------- masters
         for code, (name, values) in MASTERS.items():
@@ -985,6 +990,53 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
         defaults={"audience": "all", "channel": "in_app", "announcement_status": "published",
                   "publish_date": date.today(), "body": "All students and parents are invited to attend."},
     )
+
+    # ---- Public website / CMS content ----
+    from app.models import Banner, CmsPage
+
+    for i, (title, link) in enumerate([
+        ("Admissions Open for 2026–27 — Apply Today!", "/apply/SUMAYA"),
+        ("CBSE Board Results: 100% Pass, 40+ Distinctions", None),
+    ]):
+        await get_or_create(
+            db, Banner, tenant_id=tid, title=title,
+            defaults={"link_url": link, "sort_order": i, "is_active": True},
+        )
+    for title, slug, body in [
+        ("About Us", "about-us",
+         "Sumaya International School is a CBSE-affiliated institution committed to holistic "
+         "education from Nursery to Grade 12. Our campus blends academic rigour with sports, "
+         "arts and values-based learning, supported by experienced faculty and modern facilities."),
+        ("Academics", "academics",
+         "We follow the CBSE curriculum with a focus on conceptual learning, continuous assessment "
+         "and individual mentoring. Streams offered at senior secondary include Science, Commerce and Humanities."),
+        ("Facilities", "facilities",
+         "Smart classrooms, science and computer labs, a 20,000-book library, sports grounds, "
+         "music and art studios, transport across the city, and a hygienic cafeteria."),
+        ("Contact", "contact",
+         "Sumaya International School, 12 Campus Road, Bengaluru 560001. Phone: +91 80 1234 5678. "
+         "Email: info@sumaya.edu. Office hours: Mon–Sat, 8:00 AM – 4:00 PM."),
+    ]:
+        await get_or_create(
+            db, CmsPage, tenant_id=tid, slug=slug,
+            defaults={"title": title, "page_type": "page", "body": body, "is_published": True,
+                      "publish_date": date.today()},
+        )
+    for title, slug, ptype, body in [
+        ("Annual Day 2026 Celebrated with Grandeur", "annual-day-2026", "news",
+         "Students dazzled audiences with music, dance and drama at our Annual Day, graced by "
+         "distinguished guests and proud parents."),
+        ("Inter-school Science Fair — Our Students Win Gold", "science-fair-gold", "news",
+         "Team Sumaya bagged first place at the district science fair with an innovative project "
+         "on renewable energy."),
+        ("Parent–Teacher Meeting on Saturday", "ptm-saturday", "event",
+         "The next PTM is scheduled this Saturday from 9 AM. Please book your slot via the parent portal."),
+    ]:
+        await get_or_create(
+            db, CmsPage, tenant_id=tid, slug=slug,
+            defaults={"title": title, "page_type": ptype, "body": body, "is_published": True,
+                      "publish_date": date.today()},
+        )
 
     # ---- Portal demo users (one per persona) ----
     principal_emp = (

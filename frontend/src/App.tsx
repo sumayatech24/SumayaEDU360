@@ -32,6 +32,8 @@ import { ParentPortal as ParentPortalAdmin } from "./pages/ParentPortal";
 import { ParentPortal, StudentPortal, TeacherPortal } from "./pages/Portals";
 import { PublicAdmission } from "./pages/PublicAdmission";
 import { Promotion } from "./pages/Promotion";
+import { PublicPage } from "./pages/public/PublicPage";
+import { PublicSite } from "./pages/public/PublicSite";
 import { QuestionBank } from "./pages/QuestionBank";
 import { Reports } from "./pages/Reports";
 import { Store } from "./pages/Store";
@@ -122,6 +124,8 @@ function AdminApp() {
 export default function App() {
   return (
     <Routes>
+      <Route path="/" element={<PublicSite />} />
+      <Route path="/page/:slug" element={<PublicPage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/apply/:tenantCode" element={<PublicAdmission />} />
       <Route path="/student/*" element={<Guard need="student"><StudentPortal /></Guard>} />

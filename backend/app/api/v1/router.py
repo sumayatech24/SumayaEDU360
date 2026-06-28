@@ -18,6 +18,7 @@ from app.api.v1 import (
     meta,
     portal,
     promotion,
+    public_site,
     reporting,
     reports,
     users,
@@ -30,6 +31,7 @@ api_router.include_router(auth.router)
 api_router.include_router(admissions.router)
 api_router.include_router(branding.router)
 api_router.include_router(documents.router)
+api_router.include_router(public_site.router)
 api_router.include_router(portal.router)
 api_router.include_router(meta.router)
 api_router.include_router(masters.router)

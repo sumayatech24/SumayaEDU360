@@ -22,7 +22,7 @@ interface AuthCtx {
 }
 
 export const PORTAL_BASE: Record<string, string> = {
-  admin: "/",
+  admin: "/dashboard",
   student: "/student",
   parent: "/parent",
   teacher: "/teacher",

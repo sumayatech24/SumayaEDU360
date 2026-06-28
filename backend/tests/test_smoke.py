@@ -103,6 +103,46 @@ async def test_student_portal_daily_workflows(client):
 
 
 @pytest.mark.asyncio
+async def test_hostel_class_allocation_safeguarding_and_portal_visibility(client):
+    admin = await _login(client, "admin@sumaya.edu", "Admin@123")
+    student_headers = await _login(client, "student@sumaya.edu", "Student@123")
+    students = (await client.get("/api/v1/students", headers=admin, params={"page_size": 100})).json()["items"]
+    resident = next(s for s in students if s["admission_no"] == "ADM20250001")
+    rooms = (await client.get("/api/v1/hostel-room", headers=admin, params={"page_size": 100})).json()["items"]
+    room = rooms[0]
+
+    eligible = await client.get(
+        "/api/v1/hostel/eligible-students", headers=admin,
+        params={"grade_id": resident["grade_id"], "section_id": resident["section_id"]},
+    )
+    assert eligible.status_code == 200, eligible.text
+    assert any(s["id"] == resident["id"] for s in eligible.json())
+
+    allocation = await client.post(
+        "/api/v1/hostel/allocations", headers=admin,
+        json={"student_id": resident["id"], "room_id": room["id"]},
+    )
+    assert allocation.status_code == 200, allocation.text
+    assert allocation.json()["bed_no"] == "1"
+    attendance = await client.post(
+        "/api/v1/hostel/attendance", headers=admin,
+        json={"student_id": resident["id"], "attendance_status": "present"},
+    )
+    assert attendance.status_code == 201, attendance.text
+    visitor = await client.post(
+        "/api/v1/hostel/visitors", headers=admin,
+        json={"student_id": resident["id"], "visitor_name": "Rakesh Gupta", "relation": "father",
+              "purpose": "Parent visit"},
+    )
+    assert visitor.status_code == 201, visitor.text
+
+    portal = await client.get("/api/v1/portal/student/dashboard", headers=student_headers)
+    assert portal.status_code == 200, portal.text
+    assert portal.json()["hostel"]["room"] == room["room_no"]
+    assert portal.json()["hostel"]["recent_attendance"][0]["status"] == "present"
+
+
+@pytest.mark.asyncio
 async def test_teacher_portal_dashboard(client):
     headers = await _login(client, "teacher@sumaya.edu", "Teacher@123")
     r = await client.get("/api/v1/portal/teacher/dashboard", headers=headers)
@@ -326,3 +366,87 @@ async def test_continuing_student_applies_from_internal_portal(client):
     students = (await client.get("/api/v1/students", headers=admin)).json()["items"]
     promoted = next(s for s in students if s["id"] == enrolled.json()["student_id"])
     assert promoted["grade_id"] == target_grade["id"]
+
+
+@pytest.mark.asyncio
+async def test_library_purchase_order_receipt_updates_catalog_stock(client):
+    admin = await _login(client, "admin@sumaya.edu", "Admin@123")
+    catalog = await client.get("/api/v1/library/catalog", headers=admin)
+    assert catalog.status_code == 200, catalog.text
+    existing = catalog.json()[0]
+    starting_total = existing["total_copies"]
+
+    vendor = await client.post(
+        "/api/v1/library/vendors",
+        headers=admin,
+        json={"name": "Academic Book Supply", "contact_person": "Purchase Desk",
+              "phone": "9999999910", "email": "books@example.com"},
+    )
+    assert vendor.status_code == 201, vendor.text
+
+    request = await client.post(
+        "/api/v1/library/acquisition-requests",
+        headers=admin,
+        json={
+            "book_id": existing["id"], "title": existing["title"], "quantity": 3,
+            "estimated_unit_price": "450", "requested_by_name": "Head Librarian",
+            "priority": "high", "reason": "Additional copies for student demand",
+        },
+    )
+    assert request.status_code == 201, request.text
+    request_id = request.json()["id"]
+    approved = await client.post(
+        f"/api/v1/library/acquisition-requests/{request_id}/decision",
+        headers=admin, json={"decision": "approved", "notes": "Budget available"},
+    )
+    assert approved.status_code == 200, approved.text
+
+    po = await client.post(
+        "/api/v1/library/purchase-orders",
+        headers=admin,
+        json={
+            "vendor_id": vendor.json()["id"], "tax_amount": "67.50", "shipping_amount": "50",
+            "lines": [{
+                "acquisition_request_id": request_id, "book_id": existing["id"],
+                "title": existing["title"], "author": existing["author"],
+                "isbn": existing["isbn"], "quantity": 3, "unit_price": "450",
+            }],
+        },
+    )
+    assert po.status_code == 201, po.text
+    purchase_order = po.json()
+    assert purchase_order["status"] == "draft"
+    assert purchase_order["total_amount"] == "1467.50"
+
+    for action, expected in [("approve", "approved"), ("order", "ordered")]:
+        transition = await client.post(
+            f"/api/v1/library/purchase-orders/{purchase_order['id']}/action",
+            headers=admin, json={"action": action},
+        )
+        assert transition.status_code == 200, transition.text
+        purchase_order = transition.json()
+        assert purchase_order["status"] == expected
+
+    receipt = await client.post(
+        f"/api/v1/library/purchase-orders/{purchase_order['id']}/receipts",
+        headers=admin,
+        json={
+            "vendor_invoice_no": "INV-LIB-001",
+            "lines": [{
+                "purchase_order_line_id": purchase_order["lines"][0]["id"],
+                "accepted_quantity": 3, "rejected_quantity": 0,
+            }],
+        },
+    )
+    assert receipt.status_code == 201, receipt.text
+    assert receipt.json()["po_status"] == "received"
+
+    updated_catalog = (await client.get("/api/v1/library/catalog", headers=admin)).json()
+    updated = next(book for book in updated_catalog if book["id"] == existing["id"])
+    assert updated["total_copies"] == starting_total + 3
+    assert updated["available_copies"] == existing["available_copies"] + 3
+    requests = (await client.get("/api/v1/library/acquisition-requests", headers=admin)).json()
+    assert next(row for row in requests if row["id"] == request_id)["status"] == "fulfilled"
+    performance = await client.get("/api/v1/library/performance", headers=admin)
+    assert performance.status_code == 200, performance.text
+    assert performance.json()["summary"]["titles"] >= 1

@@ -31,6 +31,7 @@ from app.models import (
     AcademicYear,
     AdmissionLead,
     Attendance,
+    CurriculumPlan,
     Employee,
     EntityDef,
     Exam,
@@ -263,6 +264,8 @@ MASTERS: dict[str, tuple[str, list[str]]] = {
     "homework_status": ("Homework Status", ["Assigned", "Closed"]),
     "submission_status": ("Submission Status", ["Submitted", "Graded", "Late", "Missing"]),
     "lesson_plan_status": ("Lesson Plan Status", ["Planned", "In Progress", "Completed"]),
+    "curriculum_plan_status": ("Curriculum Plan Status", ["Draft", "Submitted", "Approved", "Rejected", "In Progress", "Completed"]),
+    "curriculum_term": ("Curriculum Term", ["Quarter 1", "Quarter 2", "Quarter 3", "Quarter 4"]),
     "day_of_week": ("Day of Week", ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]),
     "account_type": ("Account Type", ["Asset", "Liability", "Income", "Expense", "Equity"]),
     "expense_status": ("Expense Status", ["Pending", "Approved", "Rejected", "Paid"]),
@@ -1089,6 +1092,50 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
         # Make this teacher the class teacher of the first section
         if sections:
             sections[0].class_teacher_id = teacher_emp.id
+
+        # A submitted quarterly plan awaiting the principal's approval, plus an
+        # approved one — so the teacher portal and the reviewer queue have data.
+        _plan_subject = (await db.execute(select(Subject).where(Subject.tenant_id == tid).order_by(Subject.name))).scalars().first()
+        if _plan_subject and grades and sections:
+            await get_or_create(
+                db, CurriculumPlan, tenant_id=tid, teacher_id=teacher_emp.id,
+                term="Quarter 1", subject_id=_plan_subject.id, grade_id=grades[0].id, section_id=sections[0].id,
+                defaults={
+                    "title": f"{_plan_subject.name} — Quarter 1 Plan",
+                    "academic_year_id": ay.id,
+                    "reviewer_id": principal_emp.id if principal_emp else None,
+                    "objectives": "Build number sense, reading fluency and observation skills through activity-based learning.",
+                    "resources": "NCERT textbook, worksheets, manipulatives, classroom library.",
+                    "topics": [
+                        {"name": "Numbers up to 100", "weeks": "Week 1-2", "hours": 8, "status": "done"},
+                        {"name": "Addition & Subtraction", "weeks": "Week 3-5", "hours": 12, "status": "in_progress"},
+                        {"name": "Shapes & Patterns", "weeks": "Week 6-8", "hours": 10, "status": "pending"},
+                    ],
+                    "completion_percent": 33,
+                    "plan_status": "submitted",
+                    "submitted_at": datetime.now(timezone.utc),
+                },
+            )
+            await get_or_create(
+                db, CurriculumPlan, tenant_id=tid, teacher_id=teacher_emp.id,
+                term="Quarter 2", subject_id=_plan_subject.id, grade_id=grades[0].id, section_id=sections[0].id,
+                defaults={
+                    "title": f"{_plan_subject.name} — Quarter 2 Plan",
+                    "academic_year_id": ay.id,
+                    "reviewer_id": principal_emp.id if principal_emp else None,
+                    "objectives": "Extend operations to larger numbers and introduce measurement.",
+                    "resources": "NCERT textbook, measuring tools.",
+                    "topics": [
+                        {"name": "Numbers up to 1000", "weeks": "Week 1-3", "hours": 12, "status": "pending"},
+                        {"name": "Measurement: length & weight", "weeks": "Week 4-6", "hours": 10, "status": "pending"},
+                    ],
+                    "completion_percent": 0,
+                    "plan_status": "approved",
+                    "submitted_at": datetime.now(timezone.utc),
+                    "reviewed_at": datetime.now(timezone.utc),
+                    "review_note": "Well structured. Approved.",
+                },
+            )
 
         # A sample approved leave + payroll so the staff profile is populated
         from app.models import LeaveRequest, Payroll

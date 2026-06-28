@@ -7,7 +7,7 @@ or parent can always see their own child's data, a teacher their teaching summar
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -18,8 +18,8 @@ from app.api.v1.reporting import student_360
 from app.core.audit import record_audit
 from app.core.database import get_db
 from app.core.deps import CurrentUser, get_current_user
-from app.models.academic import Grade, Section, Subject
-from app.models.academics_ops import Homework, HomeworkSubmission, TimetablePeriod
+from app.models.academic import AcademicYear, Grade, Section, Subject
+from app.models.academics_ops import CurriculumPlan, Homework, HomeworkSubmission, TimetablePeriod
 from app.models.attendance import Attendance
 from app.models.auth import User
 from app.models.exams import Exam, ExamSubject, Marks, MarksBatch
@@ -56,6 +56,34 @@ class HomeworkCreateIn(BaseModel):
     due_date: date | None = None
     description: str | None = None
     max_marks: float = 10
+
+
+class TopicIn(BaseModel):
+    name: str
+    weeks: str | None = None
+    hours: float | None = None
+    status: str = "pending"  # pending / in_progress / done
+
+
+class PlanIn(BaseModel):
+    title: str
+    term: str = "Quarter 1"
+    academic_year_id: uuid.UUID | None = None
+    grade_id: uuid.UUID | None = None
+    section_id: uuid.UUID | None = None
+    subject_id: uuid.UUID | None = None
+    objectives: str | None = None
+    resources: str | None = None
+    topics: list[TopicIn] = []
+
+
+class PlanSubmitIn(BaseModel):
+    reviewer_id: uuid.UUID | None = None
+
+
+class PlanReviewIn(BaseModel):
+    decision: str  # approved / rejected
+    review_note: str | None = None
 
 
 def portal_for(roles: list[str], is_super: bool) -> str:
@@ -699,3 +727,321 @@ async def teacher_create_homework(
     await db.flush()
     await record_audit(db, action="create", entity="Homework", entity_id=hw.id, actor=user)
     return {"id": str(hw.id), "title": hw.title}
+
+
+# ----------------------------------------------------------------- Curriculum planning
+def _completion(topics: list | None) -> int:
+    items = topics or []
+    if not items:
+        return 0
+    done = sum(1 for t in items if (t.get("status") if isinstance(t, dict) else None) == "done")
+    return round(done / len(items) * 100)
+
+
+async def _employee_names(db: AsyncSession, tid: uuid.UUID) -> dict:
+    rows = (await db.execute(select(Employee).where(
+        Employee.tenant_id == tid, Employee.is_deleted.is_(False)
+    ))).scalars().all()
+    return {e.id: f"{e.first_name} {e.last_name or ''}".strip() for e in rows}
+
+
+def _plan_dict(p: CurriculumPlan, maps: dict, emp_names: dict) -> dict:
+    return {
+        "id": str(p.id),
+        "title": p.title,
+        "term": p.term,
+        "academic_year_id": str(p.academic_year_id) if p.academic_year_id else None,
+        "grade_id": str(p.grade_id) if p.grade_id else None,
+        "section_id": str(p.section_id) if p.section_id else None,
+        "subject_id": str(p.subject_id) if p.subject_id else None,
+        "grade": maps["grades"].get(p.grade_id, "—"),
+        "section": maps["sections"].get(p.section_id, "—"),
+        "subject": maps["subjects"].get(p.subject_id, "General"),
+        "objectives": p.objectives,
+        "resources": p.resources,
+        "topics": p.topics or [],
+        "completion_percent": p.completion_percent,
+        "status": p.plan_status,
+        "teacher": emp_names.get(p.teacher_id, "—"),
+        "reviewer": emp_names.get(p.reviewer_id, None),
+        "reviewer_id": str(p.reviewer_id) if p.reviewer_id else None,
+        "review_note": p.review_note,
+        "submitted_at": p.submitted_at.isoformat() if p.submitted_at else None,
+        "reviewed_at": p.reviewed_at.isoformat() if p.reviewed_at else None,
+    }
+
+
+@router.get("/teacher/plan-options")
+async def teacher_plan_options(
+    db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user)
+):
+    """Dropdown data for the planning form: terms, years, the teacher's own
+    class/subject combos (from active allocations) and possible reviewers."""
+    tid = user.tenant_id
+    emp_id = await _linked_employee_id(db, user)
+    maps = await _name_maps(db, tid)
+    years = (await db.execute(select(AcademicYear).where(
+        AcademicYear.tenant_id == tid, AcademicYear.is_deleted.is_(False)
+    ).order_by(AcademicYear.is_current.desc(), AcademicYear.name.desc()))).scalars().all()
+    assignments = (await db.execute(select(TeacherAssignment).where(
+        TeacherAssignment.tenant_id == tid,
+        TeacherAssignment.employee_id == emp_id,
+        TeacherAssignment.assignment_status == "active",
+        TeacherAssignment.is_deleted.is_(False),
+    ))).scalars().all()
+    classes, seen = [], set()
+    for a in assignments:
+        key = (a.grade_id, a.section_id, a.subject_id)
+        if key in seen:
+            continue
+        seen.add(key)
+        classes.append({
+            "grade_id": str(a.grade_id) if a.grade_id else None,
+            "section_id": str(a.section_id) if a.section_id else None,
+            "subject_id": str(a.subject_id) if a.subject_id else None,
+            "grade": maps["grades"].get(a.grade_id, "—"),
+            "section": maps["sections"].get(a.section_id, "—"),
+            "subject": maps["subjects"].get(a.subject_id, "General"),
+        })
+    emps = (await db.execute(select(Employee).where(
+        Employee.tenant_id == tid, Employee.is_deleted.is_(False)
+    ).order_by(Employee.first_name))).scalars().all()
+    reviewers = [
+        {"id": str(e.id), "name": f"{e.first_name} {e.last_name or ''}".strip(), "designation": e.designation}
+        for e in emps if e.id != emp_id
+    ]
+    return {
+        "terms": ["Quarter 1", "Quarter 2", "Quarter 3", "Quarter 4"],
+        "academic_years": [{"id": str(y.id), "name": y.name, "is_current": y.is_current} for y in years],
+        "classes": classes,
+        "reviewers": reviewers,
+    }
+
+
+@router.get("/teacher/plans")
+async def teacher_plans(
+    db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user)
+):
+    tid = user.tenant_id
+    emp_id = await _linked_employee_id(db, user)
+    maps = await _name_maps(db, tid)
+    emp_names = await _employee_names(db, tid)
+    rows = (await db.execute(select(CurriculumPlan).where(
+        CurriculumPlan.tenant_id == tid,
+        CurriculumPlan.teacher_id == emp_id,
+        CurriculumPlan.is_deleted.is_(False),
+    ).order_by(CurriculumPlan.created_at.desc()))).scalars().all()
+    return [_plan_dict(p, maps, emp_names) for p in rows]
+
+
+@router.post("/teacher/plans")
+async def teacher_create_plan(
+    payload: PlanIn,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    tid = user.tenant_id
+    emp_id = await _linked_employee_id(db, user)
+    topics = [t.model_dump() for t in payload.topics]
+    plan = CurriculumPlan(
+        tenant_id=tid, title=payload.title, term=payload.term,
+        academic_year_id=payload.academic_year_id, grade_id=payload.grade_id,
+        section_id=payload.section_id, subject_id=payload.subject_id, teacher_id=emp_id,
+        objectives=payload.objectives, resources=payload.resources, topics=topics,
+        completion_percent=_completion(topics), plan_status="draft",
+        created_by=user.id, updated_by=user.id,
+    )
+    db.add(plan)
+    await db.flush()
+    await record_audit(db, action="create", entity="CurriculumPlan", entity_id=plan.id, actor=user)
+    return {"id": str(plan.id), "status": plan.plan_status}
+
+
+async def _own_plan(db: AsyncSession, user: CurrentUser, emp_id: uuid.UUID, plan_id: uuid.UUID) -> CurriculumPlan:
+    plan = await db.get(CurriculumPlan, plan_id)
+    if not plan or plan.tenant_id != user.tenant_id or plan.is_deleted or plan.teacher_id != emp_id:
+        raise HTTPException(404, "Plan not found")
+    return plan
+
+
+@router.put("/teacher/plans/{plan_id}")
+async def teacher_update_plan(
+    plan_id: uuid.UUID,
+    payload: PlanIn,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    emp_id = await _linked_employee_id(db, user)
+    plan = await _own_plan(db, user, emp_id, plan_id)
+    if plan.plan_status not in ("draft", "rejected"):
+        raise HTTPException(409, "Only draft or rejected plans can be edited")
+    topics = [t.model_dump() for t in payload.topics]
+    plan.title = payload.title
+    plan.term = payload.term
+    plan.academic_year_id = payload.academic_year_id
+    plan.grade_id = payload.grade_id
+    plan.section_id = payload.section_id
+    plan.subject_id = payload.subject_id
+    plan.objectives = payload.objectives
+    plan.resources = payload.resources
+    plan.topics = topics
+    plan.completion_percent = _completion(topics)
+    plan.updated_by = user.id
+    await db.flush()
+    await record_audit(db, action="update", entity="CurriculumPlan", entity_id=plan.id, actor=user)
+    return {"id": str(plan.id), "status": plan.plan_status}
+
+
+@router.post("/teacher/plans/{plan_id}/submit")
+async def teacher_submit_plan(
+    plan_id: uuid.UUID,
+    payload: PlanSubmitIn,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    emp_id = await _linked_employee_id(db, user)
+    plan = await _own_plan(db, user, emp_id, plan_id)
+    if plan.plan_status not in ("draft", "rejected"):
+        raise HTTPException(409, "Only draft or rejected plans can be submitted")
+    if payload.reviewer_id:
+        plan.reviewer_id = payload.reviewer_id
+    if not plan.reviewer_id:
+        raise HTTPException(422, "A reviewer is required to submit a plan")
+    plan.plan_status = "submitted"
+    plan.submitted_at = datetime.now(timezone.utc)
+    plan.review_note = None
+    plan.updated_by = user.id
+    await db.flush()
+    await record_audit(db, action="submit", entity="CurriculumPlan", entity_id=plan.id, actor=user)
+    return {"id": str(plan.id), "status": plan.plan_status}
+
+
+@router.delete("/teacher/plans/{plan_id}")
+async def teacher_delete_plan(
+    plan_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    emp_id = await _linked_employee_id(db, user)
+    plan = await _own_plan(db, user, emp_id, plan_id)
+    if plan.plan_status not in ("draft", "rejected"):
+        raise HTTPException(409, "Only draft or rejected plans can be deleted")
+    plan.is_deleted = True
+    plan.updated_by = user.id
+    await record_audit(db, action="delete", entity="CurriculumPlan", entity_id=plan.id, actor=user)
+    return {"detail": "deleted", "id": str(plan_id)}
+
+
+@router.get("/teacher/plan-reviews")
+async def teacher_plan_reviews(
+    db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user)
+):
+    """Plans routed to the signed-in teacher (as HOD/reviewer) for approval."""
+    tid = user.tenant_id
+    emp_id = await _linked_employee_id(db, user)
+    maps = await _name_maps(db, tid)
+    emp_names = await _employee_names(db, tid)
+    rows = (await db.execute(select(CurriculumPlan).where(
+        CurriculumPlan.tenant_id == tid,
+        CurriculumPlan.reviewer_id == emp_id,
+        CurriculumPlan.plan_status.in_(("submitted", "approved", "rejected")),
+        CurriculumPlan.is_deleted.is_(False),
+    ).order_by(CurriculumPlan.submitted_at.desc()))).scalars().all()
+    return [_plan_dict(p, maps, emp_names) for p in rows]
+
+
+@router.post("/teacher/plans/{plan_id}/review")
+async def teacher_review_plan(
+    plan_id: uuid.UUID,
+    payload: PlanReviewIn,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    if payload.decision not in ("approved", "rejected"):
+        raise HTTPException(422, "decision must be approved or rejected")
+    emp_id = await _linked_employee_id(db, user)
+    plan = await db.get(CurriculumPlan, plan_id)
+    if not plan or plan.tenant_id != user.tenant_id or plan.is_deleted or plan.reviewer_id != emp_id:
+        raise HTTPException(404, "Plan not found")
+    if plan.plan_status != "submitted":
+        raise HTTPException(409, "Only submitted plans can be reviewed")
+    plan.plan_status = payload.decision
+    plan.review_note = payload.review_note
+    plan.reviewed_at = datetime.now(timezone.utc)
+    plan.updated_by = user.id
+    await db.flush()
+    await record_audit(db, action=payload.decision, entity="CurriculumPlan", entity_id=plan.id, actor=user)
+    return {"id": str(plan.id), "status": plan.plan_status}
+
+
+@router.get("/teacher/marks")
+async def teacher_marks(
+    exam_id: uuid.UUID | None = None,
+    subject_id: uuid.UUID | None = None,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Subject-wise marks for the teacher's own students, filterable by exam/subject."""
+    tid = user.tenant_id
+    emp_id = await _linked_employee_id(db, user)
+    maps = await _name_maps(db, tid)
+    assignments = (await db.execute(select(TeacherAssignment).where(
+        TeacherAssignment.tenant_id == tid,
+        TeacherAssignment.employee_id == emp_id,
+        TeacherAssignment.assignment_status == "active",
+        TeacherAssignment.is_deleted.is_(False),
+    ))).scalars().all()
+    grade_ids = {a.grade_id for a in assignments if a.grade_id}
+    section_ids = {a.section_id for a in assignments if a.section_id}
+    subject_ids = {a.subject_id for a in assignments if a.subject_id}
+
+    sconds = [Student.tenant_id == tid, Student.is_deleted.is_(False)]
+    if grade_ids:
+        sconds.append(Student.grade_id.in_(grade_ids))
+    if section_ids:
+        sconds.append(Student.section_id.in_(section_ids))
+    students = (await db.execute(select(Student).where(*sconds))).scalars().all()
+    student_map = {s.id: s for s in students}
+
+    subject_filter = [{"id": str(sid), "name": maps["subjects"].get(sid, "Subject")} for sid in subject_ids]
+    exams = (await db.execute(select(Exam).where(
+        Exam.tenant_id == tid, Exam.is_deleted.is_(False)
+    ).order_by(Exam.start_date.desc()))).scalars().all()
+    exam_names = {e.id: e.name for e in exams}
+
+    rows = []
+    if student_map:
+        mconds = [Marks.tenant_id == tid, Marks.is_deleted.is_(False),
+                  Marks.student_id.in_(set(student_map))]
+        if subject_id:
+            mconds.append(Marks.subject_id == subject_id)
+        elif subject_ids:
+            mconds.append(Marks.subject_id.in_(subject_ids))
+        if exam_id:
+            mconds.append(Marks.exam_id == exam_id)
+        marks = (await db.execute(select(Marks).where(*mconds))).scalars().all()
+        for m in marks:
+            s = student_map.get(m.student_id)
+            if not s:
+                continue
+            rows.append({
+                "id": str(m.id),
+                "student": f"{s.first_name} {s.last_name or ''}".strip(),
+                "admission_no": s.admission_no,
+                "grade": maps["grades"].get(s.grade_id, "—"),
+                "section": maps["sections"].get(s.section_id, "—"),
+                "exam": exam_names.get(m.exam_id, "Exam"),
+                "subject": maps["subjects"].get(m.subject_id, "Subject"),
+                "marks_obtained": str(m.marks_obtained),
+                "max_marks": str(m.max_marks),
+                "grade_letter": m.grade_letter,
+                "is_absent": m.is_absent,
+            })
+        rows.sort(key=lambda r: (r["subject"], r["exam"], r["admission_no"] or ""))
+    return {
+        "filters": {
+            "subjects": subject_filter,
+            "exams": [{"id": str(e.id), "name": e.name} for e in exams],
+        },
+        "rows": rows,
+    }

@@ -75,6 +75,8 @@ class Employee(BaseEntity, Base):
     gender: Mapped[str | None] = mapped_column(String(20), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    staff_role: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # teacher / admin_staff / accountant / librarian / management / support_staff / ...
     designation: Mapped[str | None] = mapped_column(String(100), nullable=True)
     department: Mapped[str | None] = mapped_column(String(100), nullable=True)
     address: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -1098,6 +1098,98 @@ function TeacherMarks() {
   );
 }
 
+// ---------------------------------------------------------------- Teacher: self attendance
+interface MyAttendance {
+  today: string;
+  today_state: string | null;
+  summary: Record<string, number>;
+  history: { date: string; state: string; method: string; remarks?: string }[];
+}
+
+export function StaffSelfAttendance() {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["me-attendance"],
+    queryFn: async () => (await api.get<MyAttendance>("/portal/me/attendance")).data,
+  });
+  const states = useQuery({
+    queryKey: ["master-values", "attendance_state"],
+    queryFn: async () => (await api.get<{ code: string; label: string }[]>("/master-types/attendance_state/values")).data,
+  });
+  const [state, setState] = useState("present");
+  const [busy, setBusy] = useState(false);
+
+  async function checkIn() {
+    setBusy(true);
+    try {
+      await api.post("/portal/me/attendance/check-in", { state });
+      qc.invalidateQueries({ queryKey: ["me-attendance"] });
+    } catch (e) { alert(apiError(e)); } finally { setBusy(false); }
+  }
+
+  const marked = !!data?.today_state;
+  return (
+    <div className="space-y-5">
+      <div className="card flex flex-wrap items-center justify-between gap-4 p-5">
+        <div>
+          <div className="text-[11px] uppercase tracking-wide text-slate-400">Today · {data?.today}</div>
+          {marked ? (
+            <div className="text-xl font-semibold capitalize text-emerald-600">
+              Marked: {data?.today_state?.replace("_", " ")}
+            </div>
+          ) : (
+            <div className="text-xl font-semibold text-slate-500">Not marked yet</div>
+          )}
+        </div>
+        <div className="flex items-end gap-2">
+          <label>
+            <span className="label">State</span>
+            <select className="input" value={state} onChange={(e) => setState(e.target.value)}>
+              {(states.data ?? [{ code: "present", label: "Present" }]).map((s) => (
+                <option key={s.code} value={s.code}>{s.label}</option>
+              ))}
+            </select>
+          </label>
+          <button className="btn-primary" disabled={busy} onClick={() => void checkIn()}>
+            {busy ? "Saving…" : marked ? "Update check-in" : "Check in"}
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {Object.entries(data?.summary ?? {}).map(([st, n]) => (
+          <div key={st} className="card p-4">
+            <div className="text-2xl font-semibold">{n}</div>
+            <div className="text-xs capitalize text-slate-400">{st.replace("_", " ")} (last 30)</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="card overflow-hidden">
+        <div className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-600">My Attendance History</div>
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+            <tr><th className="px-4 py-3">Date</th><th className="px-4 py-3">State</th><th className="px-4 py-3">Method</th><th className="px-4 py-3">Remarks</th></tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {data?.history.map((h, i) => (
+              <tr key={i} className="hover:bg-slate-50">
+                <td className="px-4 py-2.5">{h.date}</td>
+                <td className="px-4 py-2.5 capitalize">{h.state.replace("_", " ")}</td>
+                <td className="px-4 py-2.5 capitalize">{h.method}</td>
+                <td className="px-4 py-2.5 text-slate-400">{h.remarks || "—"}</td>
+              </tr>
+            ))}
+            {(!data?.history || data.history.length === 0) && (
+              <tr><td colSpan={4} className="px-4 py-6 text-center text-slate-400">No attendance recorded yet.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export function TeacherPortal() {
   return (
     <PortalShell
@@ -1106,17 +1198,19 @@ export function TeacherPortal() {
         { label: "Dashboard", icon: "grid", to: "" },
         { label: "Schedule", icon: "table", to: "schedule" },
         { label: "My Students", icon: "users", to: "students" },
+        { label: "My Attendance", icon: "check-square", to: "my-attendance" },
         { label: "Lesson Planning", icon: "book", to: "plans" },
-        { label: "Plan Approvals", icon: "check-square", to: "plan-reviews" },
+        { label: "Plan Approvals", icon: "shield", to: "plan-reviews" },
         { label: "Student Marks", icon: "trending-up", to: "marks" },
         { label: "Grade Homework", icon: "edit", to: "submissions" },
-        { label: "Marks Review", icon: "shield", to: "marks-review" },
+        { label: "Marks Review", icon: "activity", to: "marks-review" },
       ]}
     >
       <Routes>
         <Route index element={<TeacherHome />} />
         <Route path="schedule" element={<TeacherSchedule />} />
         <Route path="students" element={<TeacherStudents />} />
+        <Route path="my-attendance" element={<StaffSelfAttendance />} />
         <Route path="plans" element={<TeacherPlans />} />
         <Route path="plan-reviews" element={<TeacherPlanReviews />} />
         <Route path="marks" element={<TeacherMarks />} />

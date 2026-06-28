@@ -132,7 +132,8 @@ async def attendance_register(db, tid, p):
     students = await _name_map(db, Student, tid, lambda s: f"{s.first_name} {s.last_name or ''}".strip())
     rows = (
         await db.execute(select(Attendance).where(
-            Attendance.tenant_id == tid, Attendance.att_date == d, Attendance.is_deleted.is_(False)))
+            Attendance.tenant_id == tid, Attendance.att_date == d, Attendance.person_type == "student",
+            Attendance.is_deleted.is_(False)))
     ).scalars().all()
     return ([col("student", "Student"), col("date", "Date"), col("state", "State"), col("method", "Method")],
             [{"student": students.get(a.student_id, "—"), "date": _s(a.att_date),

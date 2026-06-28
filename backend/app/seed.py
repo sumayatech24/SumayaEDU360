@@ -165,8 +165,9 @@ TYPED_FIELDS: dict[str, list[tuple]] = {
         ("gender", "Gender", "select", False, False, "gender", None),
         ("email", "Email", "email", False, False, None, None),
         ("phone", "Phone", "phone", False, True, None, None),
-        ("designation", "Designation", "string", False, True, None, None),
-        ("department", "Department", "string", False, True, None, None),
+        ("staff_role", "Staff Role", "select", False, True, "staff_role", None),
+        ("designation", "Designation", "select", False, True, "designation", None),
+        ("department", "Department", "select", False, True, "department", None),
         ("date_of_joining", "Joining Date", "date", False, False, None, None),
         ("employment_type", "Type", "select", False, True, "employment_type", None),
         ("salary", "Salary", "decimal", False, False, None, None),
@@ -248,9 +249,19 @@ MASTERS: dict[str, tuple[str, list[str]]] = {
     "fee_frequency": ("Fee Frequency", ["Annual", "Term", "Monthly", "One Time"]),
     "payment_method": ("Payment Method", ["Cash", "Card", "UPI", "Netbanking", "Cheque", "Gateway"]),
     "payment_status": ("Payment Status", ["Unpaid", "Partial", "Paid", "Overdue", "Cancelled"]),
-    "attendance_state": ("Attendance State", ["Present", "Absent", "Late", "Leave", "Holiday"]),
+    "attendance_state": ("Attendance State", ["Present", "Absent", "Late", "Leave", "Holiday", "Half Day", "On Duty"]),
+    "attendance_method": ("Attendance Method", ["Manual", "QR", "RFID", "Biometric", "Face", "Geofence"]),
     "exam_type": ("Exam Type", ["Internal", "Unit Test", "Midterm", "Semester", "Final"]),
     "employment_type": ("Employment Type", ["Full Time", "Part Time", "Contract", "Visiting"]),
+    "staff_role": ("Staff Role", ["Teacher", "Admin Staff", "Accountant", "Librarian", "Management",
+                                   "Support Staff", "Counselor", "Nurse", "Lab Assistant",
+                                   "Transport Staff", "Security", "IT Staff"]),
+    "designation": ("Designation", ["Principal", "Vice Principal", "Head of Department", "Senior Teacher",
+                                     "Teacher", "Assistant Teacher", "Administrative Officer", "Accountant",
+                                     "Librarian", "Office Clerk", "Lab Assistant", "Counselor", "Nurse",
+                                     "Transport Incharge", "Security Guard"]),
+    "department": ("Department", ["Academics", "Administration", "Accounts", "Examination", "Admissions",
+                                  "Library", "Transport", "Hostel", "IT", "Sports", "Counseling", "Maintenance"]),
     "enrollment_status": ("Enrollment Status", ["Enrolled", "Promoted", "Graduated", "Transferred", "Dropped"]),
     "lead_source": ("Lead Source", ["Website", "Walk-in", "Referral", "Advertisement", "Social Media"]),
     "lead_stage": ("Lead Stage", ["Inquiry", "Counseling", "Entrance Test", "Document Collection", "Approved", "Enrolled", "Rejected"]),
@@ -731,13 +742,20 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
                   "amount": Decimal("60000"), "academic_year_id": ay.id},
     )
 
-    # Employees
-    for i, (fn, desig) in enumerate([("Anita Sharma", "Principal"), ("Rahul Verma", "Teacher"),
-                                     ("Sneha Iyer", "Accountant"), ("Imran Khan", "Teacher")], start=1):
+    # Employees — designation/department/staff_role carry master CODES (see MASTERS)
+    _staff = [
+        ("Anita Sharma", "principal", "management", "administration"),
+        ("Rahul Verma", "teacher", "teacher", "academics"),
+        ("Sneha Iyer", "accountant", "accountant", "accounts"),
+        ("Imran Khan", "teacher", "teacher", "academics"),
+        ("Meera Nair", "librarian", "librarian", "library"),
+        ("Vikram Rao", "office_clerk", "admin_staff", "administration"),
+    ]
+    for i, (fn, desig, role, dept) in enumerate(_staff, start=1):
         await get_or_create(
             db, Employee, tenant_id=tid, employee_no=f"EMP{i:04d}",
             defaults={"first_name": fn.split()[0], "last_name": fn.split()[1],
-                      "designation": desig, "department": "Academics",
+                      "designation": desig, "department": dept, "staff_role": role,
                       "date_of_joining": date(2024, 6, 1), "salary": Decimal("45000")},
         )
 
@@ -767,10 +785,19 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
             )
             # Mark some present today
             await get_or_create(
-                db, Attendance, tenant_id=tid, student_id=st.id, att_date=date.today(),
-                defaults={"section_id": section.id if section else None,
+                db, Attendance, tenant_id=tid, person_type="student", person_id=st.id, att_date=date.today(),
+                defaults={"student_id": st.id, "section_id": section.id if section else None,
                           "state": "present" if i % 4 else "absent", "method": "manual"},
             )
+
+    # Demo staff attendance for today (mirrors the student flow)
+    for j, emp in enumerate((await db.execute(select(Employee).where(
+        Employee.tenant_id == tid, Employee.is_deleted.is_(False)
+    ).order_by(Employee.employee_no))).scalars().all()):
+        await get_or_create(
+            db, Attendance, tenant_id=tid, person_type="employee", person_id=emp.id, att_date=date.today(),
+            defaults={"state": "present" if j % 5 else "leave", "method": "biometric"},
+        )
 
     # Demo exam
     await get_or_create(

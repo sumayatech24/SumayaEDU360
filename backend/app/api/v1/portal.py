@@ -668,7 +668,8 @@ async def teacher_mark_attendance(
     written = 0
     for entry in payload.entries:
         existing = (await db.execute(select(Attendance).where(
-            Attendance.tenant_id == tid, Attendance.student_id == entry.student_id,
+            Attendance.tenant_id == tid, Attendance.person_type == "student",
+            Attendance.person_id == entry.student_id,
             Attendance.att_date == payload.att_date))).scalars().first()
         if existing:
             existing.state = entry.state
@@ -676,7 +677,8 @@ async def teacher_mark_attendance(
             existing.updated_by = user.id
         else:
             db.add(Attendance(
-                tenant_id=tid, student_id=entry.student_id, att_date=payload.att_date,
+                tenant_id=tid, person_type="student", person_id=entry.student_id,
+                student_id=entry.student_id, att_date=payload.att_date,
                 state=entry.state, method="manual", marked_by=user.id,
                 created_by=user.id, updated_by=user.id,
             ))
@@ -1045,3 +1047,69 @@ async def teacher_marks(
         },
         "rows": rows,
     }
+
+
+# ----------------------------------------------------------------- Staff self check-in
+class CheckInIn(BaseModel):
+    state: str = "present"  # present / late / on_duty / leave
+    remarks: str | None = None
+
+
+@router.get("/me/attendance")
+async def my_attendance(
+    db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user)
+):
+    """The signed-in staff member's own attendance: today's status + recent history."""
+    tid = user.tenant_id
+    emp_id = await _linked_employee_id(db, user)
+    today = date.today()
+    rows = (await db.execute(select(Attendance).where(
+        Attendance.tenant_id == tid, Attendance.person_type == "employee",
+        Attendance.person_id == emp_id, Attendance.is_deleted.is_(False),
+    ).order_by(Attendance.att_date.desc()).limit(30))).scalars().all()
+    today_row = next((r for r in rows if r.att_date == today), None)
+    counts: dict[str, int] = {}
+    for r in rows:
+        counts[r.state] = counts.get(r.state, 0) + 1
+    return {
+        "today": today.isoformat(),
+        "today_state": today_row.state if today_row else None,
+        "summary": counts,
+        "history": [
+            {"date": r.att_date.isoformat(), "state": r.state, "method": r.method, "remarks": r.remarks}
+            for r in rows
+        ],
+    }
+
+
+@router.post("/me/attendance/check-in")
+async def my_check_in(
+    payload: CheckInIn,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Self-mark the signed-in staff member's attendance for today (idempotent)."""
+    tid = user.tenant_id
+    emp_id = await _linked_employee_id(db, user)
+    today = date.today()
+    existing = (await db.execute(select(Attendance).where(
+        Attendance.tenant_id == tid, Attendance.person_type == "employee",
+        Attendance.person_id == emp_id, Attendance.att_date == today,
+    ))).scalars().first()
+    if existing:
+        existing.state = payload.state
+        existing.remarks = payload.remarks
+        existing.method = "self"
+        existing.marked_by = user.id
+        existing.updated_by = user.id
+        att = existing
+    else:
+        att = Attendance(
+            tenant_id=tid, person_type="employee", person_id=emp_id, att_date=today,
+            state=payload.state, method="self", remarks=payload.remarks,
+            marked_by=user.id, created_by=user.id, updated_by=user.id,
+        )
+        db.add(att)
+    await db.flush()
+    await record_audit(db, action="self_check_in", entity="Attendance", entity_id=att.id, actor=user)
+    return {"date": today.isoformat(), "state": att.state}

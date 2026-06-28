@@ -1,4 +1,9 @@
-"""Attendance — student daily attendance (multi-method capable)."""
+"""Attendance — daily attendance for students and staff (multi-method capable).
+
+One polymorphic table keyed by ``person_type`` (student | employee). ``person_id``
+is the canonical subject id and drives uniqueness; ``student_id`` is kept populated
+for student rows so existing student-scoped queries and joins keep working.
+"""
 from __future__ import annotations
 
 import uuid
@@ -14,10 +19,13 @@ from app.models.base import BaseEntity, GUID
 class Attendance(BaseEntity, Base):
     __tablename__ = "attendance"
     __table_args__ = (
-        UniqueConstraint("tenant_id", "student_id", "att_date", name="uq_attendance_student_date"),
+        UniqueConstraint("tenant_id", "person_type", "person_id", "att_date", name="uq_attendance_person_date"),
     )
 
-    student_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("student.id"), index=True)
+    person_type: Mapped[str] = mapped_column(String(20), default="student", nullable=False, index=True)
+    # student / employee
+    person_id: Mapped[uuid.UUID] = mapped_column(GUID(), nullable=False, index=True)
+    student_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("student.id"), nullable=True, index=True)
     section_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("section.id"), nullable=True, index=True)
     att_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     state: Mapped[str] = mapped_column(String(20), default="present", nullable=False)

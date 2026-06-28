@@ -36,7 +36,9 @@ from app.models import (
     EntityDef,
     Exam,
     ExamSubject,
+    FeeInstallment,
     FeePlan,
+    FeePlanComponent,
     FieldDef,
     Grade,
     Homework,
@@ -55,6 +57,7 @@ from app.models import (
     Vehicle,
     Institution,
     Invoice,
+    InvoiceLineItem,
     MasterType,
     MasterValue,
     MenuItem,
@@ -66,6 +69,7 @@ from app.models import (
     Section,
     Setting,
     Student,
+    StudentFeeAccount,
     Subject,
     Tenant,
     TeacherAssignment,
@@ -246,7 +250,11 @@ MASTERS: dict[str, tuple[str, list[str]]] = {
     "religion": ("Religion", ["Hindu", "Muslim", "Christian", "Sikh", "Other"]),
     "category": ("Category", ["General", "OBC", "SC", "ST", "EWS"]),
     "relation": ("Guardian Relation", ["Father", "Mother", "Guardian", "Sibling"]),
-    "fee_frequency": ("Fee Frequency", ["Annual", "Term", "Monthly", "One Time"]),
+    "fee_frequency": ("Fee Frequency", ["Annual", "Half Yearly", "Quarterly"]),
+    "fee_category": ("Student Fee Category", ["Regular", "Government Aid", "Partial Government Aid", "Scholarship", "Staff Child"]),
+    "fee_head": ("School Fee Head", ["Tuition Fee", "Admission Fee", "Transport Fee", "Development Fee",
+                                     "Meals / Mess Fee", "Laboratory Fee", "Library Fee", "Activity Fee",
+                                     "Examination Fee", "Technology Fee", "Hostel Fee", "Other Fee"]),
     "payment_method": ("Payment Method", ["Cash", "Card", "UPI", "Netbanking", "Cheque", "Gateway"]),
     "payment_status": ("Payment Status", ["Unpaid", "Partial", "Paid", "Overdue", "Cancelled"]),
     "attendance_state": ("Attendance State", ["Present", "Absent", "Late", "Leave", "Holiday", "Half Day", "On Duty"]),
@@ -376,10 +384,30 @@ async def ensure_runtime_schema(db: AsyncSession) -> None:
         "ALTER TABLE employee ADD COLUMN IF NOT EXISTS address TEXT",
         "ALTER TABLE employee ADD COLUMN IF NOT EXISTS government_id_type VARCHAR(40)",
         "ALTER TABLE employee ADD COLUMN IF NOT EXISTS government_id_number VARCHAR(80)",
+        "ALTER TABLE employee ADD COLUMN IF NOT EXISTS staff_role VARCHAR(50)",
         "ALTER TABLE exam ADD COLUMN IF NOT EXISTS weightage_percent NUMERIC(5,2) NOT NULL DEFAULT 100",
         "ALTER TABLE exam ADD COLUMN IF NOT EXISTS is_final_exam BOOLEAN NOT NULL DEFAULT FALSE",
         "ALTER TABLE exam ADD COLUMN IF NOT EXISTS overall_pass_percentage NUMERIC(5,2) NOT NULL DEFAULT 40",
         "ALTER TABLE exam ADD COLUMN IF NOT EXISTS require_subject_pass BOOLEAN NOT NULL DEFAULT TRUE",
+        "ALTER TABLE student ADD COLUMN IF NOT EXISTS fee_category VARCHAR(40) NOT NULL DEFAULT 'regular'",
+        "ALTER TABLE student ADD COLUMN IF NOT EXISTS government_aid_percent NUMERIC(5,2) NOT NULL DEFAULT 0",
+        "ALTER TABLE admission_application ADD COLUMN IF NOT EXISTS fee_category VARCHAR(40) NOT NULL DEFAULT 'regular'",
+        "ALTER TABLE admission_application ADD COLUMN IF NOT EXISTS government_aid_percent NUMERIC(5,2) NOT NULL DEFAULT 0",
+        "ALTER TABLE fee_plan ADD COLUMN IF NOT EXISTS installment_count INTEGER NOT NULL DEFAULT 1",
+        "ALTER TABLE fee_plan ADD COLUMN IF NOT EXISTS allow_partial_payment BOOLEAN NOT NULL DEFAULT TRUE",
+        "ALTER TABLE fee_plan_component ADD COLUMN IF NOT EXISTS aid_eligible BOOLEAN NOT NULL DEFAULT FALSE",
+        "ALTER TABLE invoice ADD COLUMN IF NOT EXISTS fee_account_id UUID",
+        "ALTER TABLE invoice ADD COLUMN IF NOT EXISTS installment_id UUID",
+        "ALTER TABLE invoice ADD COLUMN IF NOT EXISTS government_aid_amount NUMERIC(12,2) NOT NULL DEFAULT 0",
+        # Parent-Teacher Meeting feedback & follow-up fields.
+        "ALTER TABLE ptm_meeting ADD COLUMN IF NOT EXISTS guardian_id UUID",
+        "ALTER TABLE ptm_meeting ADD COLUMN IF NOT EXISTS location VARCHAR(255)",
+        "ALTER TABLE ptm_meeting ADD COLUMN IF NOT EXISTS agenda TEXT",
+        "ALTER TABLE ptm_meeting ADD COLUMN IF NOT EXISTS teacher_feedback TEXT",
+        "ALTER TABLE ptm_meeting ADD COLUMN IF NOT EXISTS parent_feedback TEXT",
+        "ALTER TABLE ptm_meeting ADD COLUMN IF NOT EXISTS action_items JSON",
+        "ALTER TABLE ptm_meeting ADD COLUMN IF NOT EXISTS follow_up_date DATE",
+        "ALTER TABLE ptm_meeting ADD COLUMN IF NOT EXISTS parent_ack BOOLEAN NOT NULL DEFAULT FALSE",
     ]
     for stmt in statements:
         await db.execute(text(stmt))
@@ -1198,6 +1226,118 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
         # Make this teacher the class teacher of the first section
         if sections:
             sections[0].class_teacher_id = teacher_emp.id
+
+        # Configurable quarterly school fee with component-level government aid.
+        quarterly_plan, _ = await get_or_create(
+            db,
+            FeePlan,
+            tenant_id=tid,
+            code="QTR-DEMO-2526",
+            defaults={
+                "name": "Quarterly School Fee 2025-26",
+                "academic_year_id": ay.id,
+                "grade_id": grades[0].id,
+                "frequency": "quarterly",
+                "installment_count": 4,
+                "allow_partial_payment": True,
+                "amount": Decimal("60000"),
+                "description": "Tuition, transport, development and meals split quarterly.",
+            },
+        )
+        fee_components = []
+        for head, amount, aid_eligible in [
+            ("Tuition Fee", Decimal("36000"), True),
+            ("Transport Fee", Decimal("12000"), False),
+            ("Development Fee", Decimal("6000"), False),
+            ("Meals / Mess Fee", Decimal("6000"), False),
+        ]:
+            component, _ = await get_or_create(
+                db,
+                FeePlanComponent,
+                tenant_id=tid,
+                fee_plan_id=quarterly_plan.id,
+                head=head,
+                defaults={"amount": amount, "aid_eligible": aid_eligible, "is_optional": False},
+            )
+            fee_components.append(component)
+        fee_installments = []
+        for sequence, due_date in enumerate(
+            [date(2025, 4, 10), date(2025, 7, 10), date(2025, 10, 10), date(2026, 1, 10)],
+            start=1,
+        ):
+            installment, _ = await get_or_create(
+                db,
+                FeeInstallment,
+                tenant_id=tid,
+                fee_plan_id=quarterly_plan.id,
+                sequence=sequence,
+                defaults={
+                    "name": f"Quarter {sequence}",
+                    "due_date": due_date,
+                    "percentage": Decimal("25"),
+                },
+            )
+            fee_installments.append(installment)
+        fee_students = (await db.execute(select(Student).where(
+            Student.tenant_id == tid,
+            Student.section_id == sections[0].id,
+            Student.is_deleted.is_(False),
+        ).order_by(Student.admission_no))).scalars().all()
+        for student_index, student in enumerate(fee_students):
+            aid_percent = Decimal("50") if student_index == 0 else Decimal("100") if student_index == 1 else Decimal("0")
+            student.fee_category = "government_aid" if aid_percent else "regular"
+            student.government_aid_percent = aid_percent
+            account, _ = await get_or_create(
+                db,
+                StudentFeeAccount,
+                tenant_id=tid,
+                student_id=student.id,
+                fee_plan_id=quarterly_plan.id,
+                defaults={
+                    "academic_year_id": ay.id,
+                    "fee_category": student.fee_category,
+                    "government_aid_percent": aid_percent,
+                    "scholarship_amount": Decimal("0"),
+                },
+            )
+            for installment in fee_installments:
+                gross = Decimal("15000")
+                aid = Decimal("9000") * aid_percent / Decimal("100")
+                invoice, created = await get_or_create(
+                    db,
+                    Invoice,
+                    tenant_id=tid,
+                    invoice_no=f"QTR-{student.admission_no}-{installment.sequence}",
+                    defaults={
+                        "student_id": student.id,
+                        "fee_plan_id": quarterly_plan.id,
+                        "fee_account_id": account.id,
+                        "installment_id": installment.id,
+                        "academic_year_id": ay.id,
+                        "issue_date": date(2025, 4, 1),
+                        "due_date": installment.due_date,
+                        "gross_amount": gross,
+                        "government_aid_amount": aid,
+                        "discount_amount": Decimal("0"),
+                        "net_amount": gross - aid,
+                        "paid_amount": Decimal("0"),
+                        "payment_status": "overdue",
+                    },
+                )
+                if created:
+                    for component in fee_components:
+                        line_gross = Decimal(component.amount) / Decimal("4")
+                        line_aid = line_gross * aid_percent / Decimal("100") if component.aid_eligible else Decimal("0")
+                        db.add(InvoiceLineItem(
+                            tenant_id=tid,
+                            invoice_id=invoice.id,
+                            fee_component_id=component.id,
+                            head=component.head,
+                            gross_amount=line_gross,
+                            government_aid_amount=line_aid,
+                            discount_amount=Decimal("0"),
+                            net_amount=line_gross - line_aid,
+                        ))
 
         # A submitted quarterly plan awaiting the principal's approval, plus an
         # approved one — so the teacher portal and the reviewer queue have data.

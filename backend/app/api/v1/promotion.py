@@ -21,8 +21,24 @@ from app.models.tenant import Institution
 router = APIRouter(prefix="/promotion", tags=["Promotion"])
 
 
-def _grade_label(percentage: float, passed: bool) -> str:
-    """CBSE-style scholastic grade bands; eligibility still follows configured policy."""
+def _grade_label(percentage: float, passed: bool, board: str) -> str:
+    """Render the institution board's result grade; policy controls pass/fail."""
+    if "ISC" in board or "CISCE" in board:
+        if not passed:
+            return "9"
+        if percentage >= 90:
+            return "1"
+        if percentage >= 80:
+            return "2"
+        if percentage >= 70:
+            return "3"
+        if percentage >= 60:
+            return "4"
+        if percentage >= 50:
+            return "5"
+        if percentage >= 40:
+            return "6"
+        return "7"
     if not passed:
         return "E"
     if percentage >= 91:
@@ -220,7 +236,7 @@ async def _eligibility(
             "eligible": eligible,
             "reason": "; ".join(reasons) if reasons else "Eligible for promotion",
             "result": result,
-            "grade": _grade_label(overall, eligible),
+            "grade": _grade_label(overall, eligible, board),
             "failed_subjects": failed,
             "subject_results": subject_results,
             "rank": None,

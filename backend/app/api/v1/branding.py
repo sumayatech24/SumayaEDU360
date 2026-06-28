@@ -13,17 +13,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.deps import CurrentUser, get_current_user
 from app.models.meta import Setting
-from app.models.tenant import Tenant
+from app.models.tenant import Institution, Tenant
 
 router = APIRouter(tags=["Branding"])
 
 BRANDING_KEYS = ("branding.institution_name", "branding.logo_url", "branding.tagline",
-                 "branding.primary_color")
+                 "branding.primary_color", "branding.address", "branding.phone",
+                 "branding.email", "branding.website")
 DEFAULTS = {
     "branding.institution_name": "SumayaEDU360",
     "branding.logo_url": "",
     "branding.tagline": "AI EduOS",
     "branding.primary_color": "#2563eb",
+    "branding.address": "",
+    "branding.phone": "",
+    "branding.email": "",
+    "branding.website": "",
 }
 
 
@@ -37,11 +42,21 @@ async def _branding_for(db: AsyncSession, tenant_id) -> dict:
         val = (s.value_json or {}).get("value") if isinstance(s.value_json, dict) else s.value_json
         if val not in (None, ""):
             out[s.key] = val
+    # Fall back to the registered institution's address when none is set in branding.
+    if not out["branding.address"]:
+        inst = (await db.execute(select(Institution).where(
+            Institution.tenant_id == tenant_id, Institution.is_deleted.is_(False)).limit(1))).scalars().first()
+        if inst and inst.address:
+            out["branding.address"] = inst.address
     return {
         "institution_name": out["branding.institution_name"],
         "logo_url": out["branding.logo_url"],
         "tagline": out["branding.tagline"],
         "primary_color": out["branding.primary_color"],
+        "address": out["branding.address"],
+        "phone": out["branding.phone"],
+        "email": out["branding.email"],
+        "website": out["branding.website"],
     }
 
 
@@ -52,7 +67,8 @@ async def public_branding(db: AsyncSession = Depends(get_db)):
     if not tenant:
         return {"institution_name": DEFAULTS["branding.institution_name"],
                 "logo_url": "", "tagline": DEFAULTS["branding.tagline"],
-                "primary_color": DEFAULTS["branding.primary_color"]}
+                "primary_color": DEFAULTS["branding.primary_color"],
+                "address": "", "phone": "", "email": "", "website": ""}
     return await _branding_for(db, tenant.id)
 
 

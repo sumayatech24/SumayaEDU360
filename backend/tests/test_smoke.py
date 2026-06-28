@@ -462,6 +462,102 @@ async def test_annual_cumulative_results_leaders_failures_and_promotion(client):
 
 
 @pytest.mark.asyncio
+async def test_academic_year_installment_fees_aid_dues_and_reminders(client):
+    admin = await _login(client, "admin@sumaya.edu", "Admin@123")
+    years = (await client.get(
+        "/api/v1/academic-years", headers=admin, params={"page_size": 100}
+    )).json()["items"]
+    grades = (await client.get(
+        "/api/v1/grades", headers=admin, params={"page_size": 100}
+    )).json()["items"]
+    sections = (await client.get(
+        "/api/v1/sections", headers=admin, params={"page_size": 200}
+    )).json()["items"]
+    section = sections[0]
+    grade = next(item for item in grades if item["id"] == section["grade_id"])
+
+    plan = await client.post(
+        "/api/v1/fees/plans",
+        headers=admin,
+        json={
+            "name": "Half Yearly Aid Test",
+            "code": "HY-AID-TEST",
+            "academic_year_id": years[0]["id"],
+            "grade_id": grade["id"],
+            "frequency": "half_yearly",
+            "first_due_date": "2026-04-10",
+            "components": [
+                {"head": "Tuition Fee", "amount": 10000, "aid_eligible": True},
+                {"head": "Transport Fee", "amount": 4000, "aid_eligible": False},
+                {"head": "Meals / Mess Fee", "amount": 2000, "aid_eligible": False},
+            ],
+        },
+    )
+    assert plan.status_code == 201, plan.text
+    assert plan.json()["installment_count"] == 2
+
+    assigned = await client.post(
+        "/api/v1/fees/assign",
+        headers=admin,
+        json={
+            "fee_plan_id": plan.json()["id"],
+            "grade_id": grade["id"],
+            "section_id": section["id"],
+            "government_aid_percent": 50,
+        },
+    )
+    assert assigned.status_code == 201, assigned.text
+    assert assigned.json()["invoices_generated"] >= 2
+
+    dues = await client.get(
+        "/api/v1/fees/dues",
+        headers=admin,
+        params={"academic_year_id": years[0]["id"], "grade_id": grade["id"]},
+    )
+    assert dues.status_code == 200, dues.text
+    test_rows = [row for row in dues.json()["rows"] if row["invoice_no"].startswith("FEE-HY-AID-TEST")]
+    assert test_rows
+    row = test_rows[0]
+    assert float(row["gross_amount"]) == 8000
+    assert float(row["government_aid_amount"]) == 2500
+    assert float(row["net_amount"]) == 5500
+    assert {component["head"] for component in row["components"]} == {
+        "Tuition Fee", "Transport Fee", "Meals / Mess Fee"
+    }
+
+    reminder = await client.post(
+        "/api/v1/fees/reminders",
+        headers=admin,
+        json={"invoice_ids": [row["id"]], "channels": ["in_app", "email", "whatsapp"]},
+    )
+    assert reminder.status_code == 200, reminder.text
+    assert reminder.json()["deliveries_created"] == 3
+
+    paid = await client.post(
+        "/api/v1/fees/payments",
+        headers=admin,
+        json={"invoice_id": row["id"], "amount": 500, "method": "upi"},
+    )
+    assert paid.status_code == 201, paid.text
+    overpay = await client.post(
+        "/api/v1/fees/payments",
+        headers=admin,
+        json={"invoice_id": row["id"], "amount": 999999, "method": "cash"},
+    )
+    assert overpay.status_code == 422, overpay.text
+
+    parent = await _login(client, "parent@sumaya.edu", "Parent@123")
+    dashboard = await client.get("/api/v1/portal/student/dashboard", headers=parent)
+    assert dashboard.status_code == 200, dashboard.text
+    installment_invoices = [
+        invoice for invoice in dashboard.json()["invoices"] if invoice.get("installment") != "Annual"
+    ]
+    assert installment_invoices
+    assert installment_invoices[0]["academic_year"]
+    assert installment_invoices[0]["components"]
+
+
+@pytest.mark.asyncio
 async def test_complete_new_admission_lifecycle(client):
     config = (await client.get("/api/v1/public/admissions/SUMAYA/config")).json()
     grade = config["grades"][0]

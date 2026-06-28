@@ -5,7 +5,7 @@ import type { Branding as B } from "../lib/branding";
 
 export function Branding() {
   const qc = useQueryClient();
-  const [form, setForm] = useState<B>({ institution_name: "", logo_url: "", tagline: "", primary_color: "#2563eb" });
+  const [form, setForm] = useState<B>({ institution_name: "", logo_url: "", tagline: "", primary_color: "#2563eb", address: "", phone: "", email: "", website: "" });
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -38,6 +38,10 @@ export function Branding() {
         ["branding.logo_url", form.logo_url],
         ["branding.tagline", form.tagline],
         ["branding.primary_color", form.primary_color],
+        ["branding.address", form.address ?? ""],
+        ["branding.phone", form.phone ?? ""],
+        ["branding.email", form.email ?? ""],
+        ["branding.website", form.website ?? ""],
       ];
       for (const [key, value] of entries) {
         await api.put(`/settings/${key}`, { key, value_json: { value }, data_type: "string" });
@@ -97,6 +101,29 @@ export function Branding() {
           <div>
             <label className="label">Primary Colour</label>
             <input type="color" className="input h-10 w-20 p-1" value={form.primary_color} onChange={(e) => setForm({ ...form, primary_color: e.target.value })} />
+          </div>
+        </div>
+
+        <div className="border-t border-slate-100 pt-4">
+          <h2 className="text-sm font-semibold text-slate-600">Report header & footer</h2>
+          <p className="mb-3 text-xs text-slate-400">The logo above and these details appear on every printed report, marksheet and receipt — address shows at the bottom of each page.</p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <label className="label">School Address</label>
+              <textarea className="input min-h-16" value={form.address ?? ""} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="123 School Road, City, State — PIN" />
+            </div>
+            <div>
+              <label className="label">Phone</label>
+              <input className="input" value={form.phone ?? ""} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+            </div>
+            <div>
+              <label className="label">Email</label>
+              <input className="input" value={form.email ?? ""} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            </div>
+            <div className="col-span-2">
+              <label className="label">Website</label>
+              <input className="input" value={form.website ?? ""} onChange={(e) => setForm({ ...form, website: e.target.value })} />
+            </div>
           </div>
         </div>
 

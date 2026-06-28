@@ -26,10 +26,14 @@ from app.models.auth import (  # noqa: F401
 )
 from app.models.exams import Exam, ExamSubject, Marks, MarksBatch, QuestionPaper  # noqa: F401
 from app.models.fees import (  # noqa: F401
+    FeeInstallment,
     FeePlan,
     FeePlanComponent,
+    FeeReminder,
     Invoice,
+    InvoiceLineItem,
     Payment,
+    StudentFeeAccount,
 )
 from app.models.meta import (  # noqa: F401
     AuditLog,
@@ -64,6 +68,7 @@ from app.models.content import (  # noqa: F401
     PtmMeeting,
     QuestionBankItem,
 )
+from app.models.engagement import Complaint, ComplaintUpdate  # noqa: F401
 from app.models.hostel import (  # noqa: F401
     HostelAllocation,
     HostelAttendance,
@@ -124,7 +129,8 @@ __all__ = [
     "AdmissionDocument", "AdmissionVerification", "Attendance",
     "Permission", "Role", "RolePermission", "User", "UserRole",
     "Exam", "ExamSubject", "Marks", "MarksBatch", "QuestionPaper",
-    "FeePlan", "FeePlanComponent", "Invoice", "Payment",
+    "FeePlan", "FeePlanComponent", "FeeInstallment", "StudentFeeAccount",
+    "Invoice", "InvoiceLineItem", "Payment", "FeeReminder",
     "AuditLog", "Document", "EntityDef", "EntityRecord", "FieldDef", "MasterType",
     "MasterValue", "MenuItem", "Module", "ModuleCapability", "Notification", "Setting",
     "Employee", "Guardian", "Student", "Teacher", "TeacherAssignment", "TeacherProfile",
@@ -141,5 +147,6 @@ __all__ = [
     "InventoryItem", "StockMovement", "AssetAssignment", "Activity", "ActivityRegistration",
     "MealPlan", "MealMenu", "Announcement", "CmsPage", "Banner",
     "LearningResource", "KnowledgeArticle", "QuestionBankItem", "PtmMeeting",
+    "Complaint", "ComplaintUpdate",
     "StudentAcademicHistory", "Achievement", "DisciplinaryAction", "StudentRemark",
 ]

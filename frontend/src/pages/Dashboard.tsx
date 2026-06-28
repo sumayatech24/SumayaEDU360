@@ -1,8 +1,22 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { api, apiError } from "../lib/api";
 import { Icon } from "../components/Icon";
 import { useAuth } from "../lib/auth";
+
+/** Where each KPI card drills into. Keys match the dashboard `cards` payload. */
+const CARD_LINKS: Record<string, string> = {
+  students: "/students",
+  employees: "/employees",
+  modules: "/masters",
+  present_today: "/attendance",
+  books_out: "/library",
+  pending_leave: "/hr",
+  pending_expenses: "/finance",
+  low_stock: "/store",
+  activities: "/activities",
+};
 
 interface DashboardData {
   cards: { key: string; label: string; value: number; icon: string }[];
@@ -80,23 +94,37 @@ export function Dashboard() {
       {portal?.person_type === "employee" && <SelfCheckInCard />}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {data?.cards.map((c) => (
-          <div key={c.key} className="card flex items-center gap-4 p-5">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
-              <Icon name={c.icon} />
-            </div>
-            <div>
-              <div className="text-2xl font-semibold">{c.value}</div>
-              <div className="text-xs text-slate-400">{c.label}</div>
-            </div>
-          </div>
-        ))}
+        {data?.cards.map((c) => {
+          const to = CARD_LINKS[c.key];
+          const body = (
+            <>
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+                <Icon name={c.icon} />
+              </div>
+              <div>
+                <div className="text-2xl font-semibold">{c.value}</div>
+                <div className="text-xs text-slate-400">{c.label}</div>
+              </div>
+            </>
+          );
+          return to ? (
+            <Link
+              key={c.key}
+              to={to}
+              className="card flex items-center gap-4 p-5 transition hover:border-brand-300 hover:shadow-sm"
+            >
+              {body}
+            </Link>
+          ) : (
+            <div key={c.key} className="card flex items-center gap-4 p-5">{body}</div>
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <FinanceCard label="Total Billed" value={inr(data?.finance.total_billed)} tone="slate" />
-        <FinanceCard label="Collected" value={inr(data?.finance.total_collected)} tone="green" />
-        <FinanceCard label="Outstanding" value={inr(data?.finance.outstanding)} tone="amber" />
+        <FinanceCard label="Total Billed" value={inr(data?.finance.total_billed)} tone="slate" to="/fees" />
+        <FinanceCard label="Collected" value={inr(data?.finance.total_collected)} tone="green" to="/fees" />
+        <FinanceCard label="Outstanding" value={inr(data?.finance.outstanding)} tone="amber" to="/fees" />
       </div>
 
       <div className="card p-5">
@@ -126,16 +154,21 @@ export function Dashboard() {
   );
 }
 
-function FinanceCard({ label, value, tone }: { label: string; value: string; tone: string }) {
+function FinanceCard({ label, value, tone, to }: { label: string; value: string; tone: string; to?: string }) {
   const tones: Record<string, string> = {
     slate: "text-slate-700",
     green: "text-emerald-600",
     amber: "text-amber-600",
   };
-  return (
-    <div className="card p-5">
+  const inner = (
+    <>
       <div className="text-xs text-slate-400">{label}</div>
       <div className={`mt-1 text-2xl font-semibold ${tones[tone]}`}>{value}</div>
-    </div>
+    </>
+  );
+  return to ? (
+    <Link to={to} className="card block p-5 transition hover:border-brand-300 hover:shadow-sm">{inner}</Link>
+  ) : (
+    <div className="card p-5">{inner}</div>
   );
 }

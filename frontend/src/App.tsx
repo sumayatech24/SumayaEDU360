@@ -14,6 +14,7 @@ import { Communication } from "./pages/Communication";
 import { Curriculum } from "./pages/Curriculum";
 import { Dashboard } from "./pages/Dashboard";
 import { EmployeeProfile } from "./pages/EmployeeProfile";
+import { Engagement } from "./pages/Engagement";
 import { Exams } from "./pages/Exams";
 import { Fees } from "./pages/Fees";
 import { FieldCustomizer } from "./pages/FieldCustomizer";
@@ -81,6 +82,7 @@ function AdminApp() {
         <Route path="/parent-portal" element={<ParentPortalAdmin />} />
         <Route path="/question-bank" element={<QuestionBank />} />
         <Route path="/promotion" element={<Promotion />} />
+        <Route path="/engagement" element={<Engagement />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/integrations" element={<Integrations />} />
         <Route path="/masters" element={<Masters />} />

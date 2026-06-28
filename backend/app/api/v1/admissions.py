@@ -66,6 +66,8 @@ class PublicApplicationIn(BaseModel):
     mother_name: str | None = None
     mother_phone: str | None = None
     previous_school: str | None = None
+    fee_category: str = "regular"
+    government_aid_percent: Decimal = Field(default=Decimal(0), ge=0, le=100)
     documents: list[DocumentIn] = Field(default_factory=list)
     declaration_accepted: bool
 
@@ -177,7 +179,9 @@ async def _application_view(db: AsyncSession, app: AdmissionApplication) -> dict
         "id": str(app.id), "application_no": app.application_no,
         "application_type": app.application_type, "channel": app.channel,
         "status": app.application_status, "verification_status": app.verification_status,
-        "fee_status": app.fee_status, "submitted_at": app.submitted_at,
+        "fee_status": app.fee_status, "fee_category": app.fee_category,
+        "government_aid_percent": str(app.government_aid_percent),
+        "submitted_at": app.submitted_at,
         "decision_notes": app.decision_notes,
         "student_name": lead.student_name if lead else None,
         "phone": lead.phone if lead else None, "email": lead.email if lead else None,
@@ -325,7 +329,8 @@ async def submit_public_application(
         phone=payload.phone or applicant.phone, email=payload.email or applicant.email,
         grade_applied_id=grade.id, source="public_portal", stage="document_collection",
         **payload.model_dump(exclude={"student_name", "phone", "email", "grade_applied_id",
-                                      "academic_year_id", "documents", "declaration_accepted"}),
+                                      "academic_year_id", "documents", "declaration_accepted",
+                                      "fee_category", "government_aid_percent"}),
     )
     db.add(lead)
     await db.flush()
@@ -334,7 +339,8 @@ async def submit_public_application(
         applicant_id=applicant.id, application_type="new", channel="public",
         academic_year_id=payload.academic_year_id, target_grade_id=grade.id,
         application_status="submitted", submitted_at=_utcnow(),
-        declaration_accepted=True,
+        declaration_accepted=True, fee_category=payload.fee_category,
+        government_aid_percent=payload.government_aid_percent,
     )
     db.add(app)
     await db.flush()
@@ -662,6 +668,7 @@ async def enroll_application(
             religion=lead.religion, nationality=lead.nationality, address=lead.address,
             city=lead.city, state=lead.state, pincode=lead.pincode,
             previous_school=lead.previous_school, created_by=user.id, updated_by=user.id,
+            fee_category=app.fee_category, government_aid_percent=app.government_aid_percent,
         )
         db.add(student)
         await db.flush()

@@ -102,6 +102,8 @@ class AdmissionApplication(BaseEntity, Base):
     # pending / in_progress / verified / issues
     fee_status: Mapped[str] = mapped_column(String(24), default="not_assigned", nullable=False)
     # not_assigned / unpaid / partial / paid / waived
+    fee_category: Mapped[str] = mapped_column(String(40), default="regular", nullable=False)
+    government_aid_percent: Mapped[Numeric] = mapped_column(Numeric(5, 2), default=0, nullable=False)
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     decided_by: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)

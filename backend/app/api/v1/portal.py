@@ -23,6 +23,8 @@ from app.models.academic import AcademicYear, Grade, Section, Subject
 from app.models.academics_ops import CurriculumPlan, Homework, HomeworkSubmission, TimetablePeriod
 from app.models.attendance import Attendance
 from app.models.auth import User
+from app.models.content import PtmMeeting
+from app.models.engagement import Complaint
 from app.models.exams import Exam, ExamSubject, Marks, MarksBatch
 from app.models.operations import Activity, ActivityRegistration, Announcement
 from app.models.people import Employee, Student, TeacherAssignment, TeacherProfile
@@ -54,6 +56,7 @@ class HomeworkCreateIn(BaseModel):
     subject_id: uuid.UUID | None = None
     grade_id: uuid.UUID | None = None
     section_id: uuid.UUID | None = None
+    assigned_date: date | None = None
     due_date: date | None = None
     description: str | None = None
     max_marks: float = 10
@@ -431,9 +434,18 @@ async def teacher_dashboard(
     teacher = None
     profile = None
     assignments = []
+    my_open_complaints = 0
+    my_meetings = 0
     if db_user.person_id:
         emp = await db.get(Employee, db_user.person_id)
         if emp:
+            my_open_complaints = (await db.execute(select(func.count()).select_from(Complaint).where(
+                Complaint.tenant_id == tid, Complaint.assigned_to_id == emp.id,
+                Complaint.complaint_status.in_(("open", "assigned", "in_progress", "reopened")),
+                Complaint.is_deleted.is_(False)))).scalar_one()
+            my_meetings = (await db.execute(select(func.count()).select_from(PtmMeeting).where(
+                PtmMeeting.tenant_id == tid, PtmMeeting.teacher_id == emp.id,
+                PtmMeeting.meeting_status == "scheduled", PtmMeeting.is_deleted.is_(False)))).scalar_one()
             teacher = {"name": f"{emp.first_name} {emp.last_name or ''}".strip(),
                        "designation": emp.designation, "department": emp.department,
                        "email": emp.email, "phone": emp.phone}
@@ -495,6 +507,8 @@ async def teacher_dashboard(
             {"key": "marked_today", "label": "Attendance Marked Today", "value": marked_today, "icon": "check-square"},
             {"key": "homework_open", "label": "Open Homework", "value": homework_open, "icon": "edit"},
             {"key": "to_grade", "label": "Submissions to Grade", "value": to_grade, "icon": "book"},
+            {"key": "my_complaints", "label": "Open Complaints", "value": my_open_complaints, "icon": "shield"},
+            {"key": "my_meetings", "label": "Upcoming Meetings", "value": my_meetings, "icon": "calendar"},
         ],
         "announcements": await _announcements(db, tid, "teachers"),
     }
@@ -1201,9 +1215,11 @@ async def teacher_homework_list(
     ).order_by(Homework.created_at.desc()))).scalars().all()
     return [
         {
-            "id": str(h.id), "title": h.title,
+            "id": str(h.id), "title": h.title, "description": h.description,
             "subject": maps["subjects"].get(h.subject_id, "General"),
-            "grade": maps["grades"].get(h.grade_id, "All"),
+            "grade": maps["grades"].get(h.grade_id, "All classes"),
+            "section": maps["sections"].get(h.section_id) if h.section_id else None,
+            "assigned_date": h.assigned_date.isoformat() if h.assigned_date else None,
             "due_date": h.due_date.isoformat() if h.due_date else None,
             "max_marks": str(h.max_marks), "status": h.homework_status,
         }
@@ -1222,7 +1238,7 @@ async def teacher_create_homework(
     hw = Homework(
         tenant_id=user.tenant_id, title=payload.title, subject_id=payload.subject_id,
         grade_id=payload.grade_id, section_id=payload.section_id, due_date=payload.due_date,
-        assigned_date=date.today(), description=payload.description,
+        assigned_date=payload.assigned_date or date.today(), description=payload.description,
         max_marks=Decimal(str(payload.max_marks)), homework_status="assigned",
         created_by=user.id, updated_by=user.id,
     )
@@ -1230,6 +1246,22 @@ async def teacher_create_homework(
     await db.flush()
     await record_audit(db, action="create", entity="Homework", entity_id=hw.id, actor=user)
     return {"id": str(hw.id), "title": hw.title}
+
+
+@router.delete("/teacher/homework/{homework_id}")
+async def teacher_delete_homework(
+    homework_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    hw = await db.get(Homework, homework_id)
+    if not hw or hw.tenant_id != user.tenant_id or hw.is_deleted:
+        raise HTTPException(404, "Homework not found")
+    hw.is_deleted = True
+    hw.updated_by = user.id
+    await db.flush()
+    await record_audit(db, action="delete", entity="Homework", entity_id=hw.id, actor=user)
+    return {"detail": "homework removed"}
 
 
 # ----------------------------------------------------------------- Curriculum planning

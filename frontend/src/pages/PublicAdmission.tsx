@@ -29,6 +29,7 @@ const blank = {
   date_of_birth: "", gender: "", category: "", religion: "", nationality: "Indian",
   address: "", city: "", state: "", pincode: "", father_name: "", father_phone: "",
   mother_name: "", mother_phone: "", previous_school: "",
+  fee_category: "regular", government_aid_percent: "0",
 };
 
 export function PublicAdmission() {
@@ -166,6 +167,16 @@ export function PublicAdmission() {
               <Field label="Category" value={form.category} onChange={(v) => setForm({ ...form, category: v })} />
               <Field label="Previous school" value={form.previous_school} onChange={(v) => setForm({ ...form, previous_school: v })} />
               <Field label="Nationality" value={form.nationality} onChange={(v) => setForm({ ...form, nationality: v })} />
+            </Section>
+            <Section title="Fee category & aid">
+              <Select label="Fee category" value={form.fee_category} onChange={(v) => setForm({ ...form, fee_category: v })} options={[
+                { id: "regular", name: "Regular / Self-funded" },
+                { id: "government_aid", name: "Government Aid" },
+                { id: "partial_government_aid", name: "Partial Government Aid" },
+                { id: "scholarship", name: "Scholarship" },
+                { id: "staff_child", name: "Staff Child" },
+              ]} />
+              <Field label="Government aid on tuition (%)" type="number" value={form.government_aid_percent} onChange={(v) => setForm({ ...form, government_aid_percent: v })} />
             </Section>
             <Section title="Contact and guardians">
               <Field label="Email" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} />

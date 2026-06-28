@@ -84,7 +84,7 @@ export function StudentProfile() {
         </Link>
         <button
           className="btn-primary text-sm"
-          onClick={() => printMarksheet(branding.institution_name, s, data.marks)}
+          onClick={() => printMarksheet(branding, s, data.marks)}
         >
           Download Marksheet
         </button>

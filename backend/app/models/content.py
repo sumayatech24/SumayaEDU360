@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, time
 
-from sqlalchemy import Date, ForeignKey, Integer, String, Text, Time
+from sqlalchemy import JSON, Boolean, Date, ForeignKey, Integer, String, Text, Time
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -51,9 +51,18 @@ class PtmMeeting(BaseEntity, Base):
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     student_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("student.id"), nullable=True)
     teacher_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
+    guardian_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
     meeting_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     slot_time: Mapped[time | None] = mapped_column(Time, nullable=True)
-    mode: Mapped[str] = mapped_column(String(20), default="in_person", nullable=False)  # in_person/online
+    mode: Mapped[str] = mapped_column(String(20), default="in_person", nullable=False)  # in_person/online/phone
+    location: Mapped[str | None] = mapped_column(String(255), nullable=True)  # room or meeting link
     meeting_status: Mapped[str] = mapped_column(String(20), default="scheduled", nullable=False)
     # scheduled / completed / cancelled / no_show
+    agenda: Mapped[str | None] = mapped_column(Text, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    teacher_feedback: Mapped[str | None] = mapped_column(Text, nullable=True)
+    parent_feedback: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # [{"text": str, "owner": "teacher|parent", "done": bool}]
+    action_items: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    follow_up_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    parent_ack: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

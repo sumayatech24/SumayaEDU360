@@ -199,6 +199,8 @@ class StudentBase(_StudentExtra):
     section_id: uuid.UUID | None = None
     enrollment_status: str = "enrolled"
     photo_url: str | None = None
+    fee_category: str = "regular"
+    government_aid_percent: Decimal = Decimal(0)
 
 
 class StudentCreate(StudentBase):
@@ -226,6 +228,8 @@ class StudentUpdate(_StudentExtra):
     section_id: uuid.UUID | None = None
     enrollment_status: str | None = None
     photo_url: str | None = None
+    fee_category: str | None = None
+    government_aid_percent: Decimal | None = None
 
 
 class StudentOut(AuditedOut, StudentBase):

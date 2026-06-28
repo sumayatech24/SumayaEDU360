@@ -40,6 +40,8 @@ class Student(BaseEntity, Base):
     # Extended personal / admission details
     admission_date: Mapped["Date"] = mapped_column(Date, nullable=True)
     category: Mapped[str | None] = mapped_column(String(40), nullable=True)  # General/OBC/SC/ST/EWS
+    fee_category: Mapped[str] = mapped_column(String(40), default="regular", nullable=False)
+    government_aid_percent: Mapped[Numeric] = mapped_column(Numeric(5, 2), default=0, nullable=False)
     religion: Mapped[str | None] = mapped_column(String(40), nullable=True)
     nationality: Mapped[str | None] = mapped_column(String(40), nullable=True)
     mother_tongue: Mapped[str | None] = mapped_column(String(40), nullable=True)

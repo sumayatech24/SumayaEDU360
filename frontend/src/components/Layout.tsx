@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { MenuItem } from "../lib/types";
@@ -7,17 +8,54 @@ import { Brand } from "./Brand";
 import { GlobalSearch } from "./GlobalSearch";
 import { Icon } from "./Icon";
 
+/** Logical sidebar grouping: maps a route to its section. Anything unmapped
+ *  (e.g. registry-driven `/m/...` modules) falls into "More Modules". */
+const GROUP_FOR: Record<string, string> = {
+  "/dashboard": "Overview",
+  "/academic": "Academics", "/curriculum": "Academics", "/timetable": "Academics",
+  "/exams": "Academics", "/promotion": "Academics", "/question-bank": "Academics",
+  "/homework": "Academics", "/teacher-allocation": "Academics",
+  "/students": "Students & Admissions", "/admissions": "Students & Admissions", "/attendance": "Students & Admissions",
+  "/employees": "Staff & HR", "/hr": "Staff & HR",
+  "/engagement": "Engagement & Communication", "/communication": "Engagement & Communication",
+  "/parent-portal": "Engagement & Communication", "/cms": "Engagement & Communication",
+  "/knowledge": "Engagement & Communication", "/activities": "Engagement & Communication",
+  "/library": "Operations", "/hostel": "Operations", "/transport": "Operations",
+  "/meals": "Operations", "/store": "Operations", "/asset-tracking": "Operations",
+  "/fees": "Finance", "/finance": "Finance",
+  "/reports": "Insights",
+  "/masters": "Configuration", "/branding": "Configuration", "/customize-fields": "Configuration",
+  "/users": "Configuration", "/audit": "Configuration", "/integrations": "Configuration",
+};
+const GROUP_ORDER = [
+  "Overview", "Academics", "Students & Admissions", "Staff & HR",
+  "Engagement & Communication", "Operations", "Finance", "Insights",
+  "Configuration", "More Modules",
+];
+const groupOf = (path: string) => GROUP_FOR[path] ?? "More Modules";
+
 export function Layout() {
   const { me, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const { data: menu = [] } = useQuery({
     queryKey: ["navigation"],
     queryFn: async () => (await api.get<MenuItem[]>("/navigation")).data,
   });
 
-  const core = menu.filter((m) => !m.path.startsWith("/m/"));
-  const modules = menu.filter((m) => m.path.startsWith("/m/"));
+  // Combine DB-driven menu with statically-routed pages, then bucket into groups.
+  const items: MenuItem[] = [...menu];
+  if (!items.some((m) => m.path === "/engagement")) {
+    items.push({ id: "static-engagement", path: "/engagement", icon: "users", label: "Family Engagement", sort_order: 0 });
+  }
+  const grouped = new Map<string, MenuItem[]>();
+  GROUP_ORDER.forEach((g) => grouped.set(g, []));
+  items.forEach((m) => {
+    const g = groupOf(m.path);
+    if (!grouped.has(g)) grouped.set(g, []);
+    grouped.get(g)!.push(m);
+  });
 
   return (
     <div className="flex h-full">
@@ -27,15 +65,14 @@ export function Layout() {
         </div>
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-6">
-          <SectionLabel>Workspace</SectionLabel>
-          {core.map((m) => (
-            <NavItem key={m.id} to={m.path} icon={m.icon} label={m.label} />
-          ))}
-
-          <SectionLabel>All Modules ({modules.length})</SectionLabel>
-          {modules.map((m) => (
-            <NavItem key={m.id} to={m.path} icon={m.icon} label={m.label} />
-          ))}
+          {GROUP_ORDER.map((label) => {
+            const groupItems = grouped.get(label) ?? [];
+            if (groupItems.length === 0) return null;
+            const hasActive = groupItems.some(
+              (m) => location.pathname === m.path || location.pathname.startsWith(m.path + "/"),
+            );
+            return <NavGroup key={label} label={label} items={groupItems} hasActive={hasActive} />;
+          })}
         </nav>
       </aside>
 
@@ -71,10 +108,35 @@ export function Layout() {
   );
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+/** A collapsible sidebar section; open/closed state persists per group. */
+function NavGroup({ label, items, hasActive }: { label: string; items: MenuItem[]; hasActive: boolean }) {
+  const storeKey = `nav.group.${label}`;
+  const [open, setOpen] = useState<boolean>(() => {
+    const saved = localStorage.getItem(storeKey);
+    return saved === null ? true : saved === "1";
+  });
+  // Always reveal the section that contains the active route.
+  const expanded = open || hasActive;
+  useEffect(() => {
+    localStorage.setItem(storeKey, open ? "1" : "0");
+  }, [open, storeKey]);
+
   return (
-    <div className="px-3 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-      {children}
+    <div className="pt-1">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between rounded-md px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400 hover:text-slate-600"
+      >
+        <span>{label}</span>
+        <svg
+          className={`transition-transform ${expanded ? "rotate-90" : ""}`}
+          width="12" height="12" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+        >
+          <path d="M9 18l6-6-6-6" />
+        </svg>
+      </button>
+      {expanded && items.map((m) => <NavItem key={m.id} to={m.path} icon={m.icon} label={m.label} />)}
     </div>
   );
 }

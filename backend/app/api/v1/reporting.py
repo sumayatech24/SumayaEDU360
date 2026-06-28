@@ -18,12 +18,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.deps import CurrentUser, get_current_user
-from app.models.academic import Grade, Section, Subject
+from app.models.academic import AcademicYear, Grade, Section, Subject
 from app.models.admissions import AdmissionLead
 from app.models.attendance import Attendance
 from app.models.content import PtmMeeting
 from app.models.exams import Exam, Marks, MarksBatch
-from app.models.fees import Invoice, Payment
+from app.models.fees import FeeInstallment, Invoice, InvoiceLineItem, Payment
 from app.models.finance import Expense, Vendor
 from app.models.hostel import HostelAllocation, HostelAttendance, HostelBed, HostelBlock, HostelRoom
 from app.models.hr import LeaveRequest, Payroll
@@ -349,6 +349,19 @@ async def student_360(
     ).scalars().all()
     billed = sum((i.net_amount or Decimal(0)) for i in invoices)
     paid = sum((i.paid_amount or Decimal(0)) for i in invoices)
+    invoice_ids = [invoice.id for invoice in invoices]
+    fee_lines = (await db.execute(select(InvoiceLineItem).where(
+        InvoiceLineItem.tenant_id == tid,
+        InvoiceLineItem.invoice_id.in_(invoice_ids) if invoice_ids else InvoiceLineItem.invoice_id.is_(None),
+        InvoiceLineItem.is_deleted.is_(False),
+    ))).scalars().all()
+    fee_installments = {
+        item.id: item for item in (await db.execute(select(FeeInstallment).where(
+            FeeInstallment.tenant_id == tid,
+            FeeInstallment.is_deleted.is_(False),
+        ))).scalars().all()
+    }
+    fee_years = await _name_map(db, AcademicYear, tid, lambda year: year.name)
 
     att = (
         await db.execute(select(Attendance.state, func.count()).where(
@@ -519,7 +532,15 @@ async def student_360(
                  "invoices": len(invoices)},
         "invoices": [
             {"id": str(i.id), "invoice_no": i.invoice_no, "net": _s(i.net_amount),
-             "paid": _s(i.paid_amount), "status": i.payment_status, "due_date": _s(i.due_date)}
+             "paid": _s(i.paid_amount), "status": i.payment_status, "due_date": _s(i.due_date),
+             "academic_year": fee_years.get(i.academic_year_id, "—"),
+             "installment": fee_installments[i.installment_id].name if i.installment_id in fee_installments else "Annual",
+             "government_aid": _s(i.government_aid_amount),
+             "components": [
+                 {"head": line.head, "gross": _s(line.gross_amount),
+                  "aid": _s(line.government_aid_amount), "net": _s(line.net_amount)}
+                 for line in fee_lines if line.invoice_id == i.id
+             ]}
             for i in invoices
         ],
         "payments": [

@@ -1,11 +1,13 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import { ComplaintsPanel, MeetingsPanel } from "../components/EngagementPanels";
 import { Icon } from "../components/Icon";
 import { PortalShell } from "../components/PortalShell";
 import { api, apiError } from "../lib/api";
-import { useBranding } from "../lib/branding";
+import { useBranding, type Branding } from "../lib/branding";
 import { printMarksheet } from "../lib/print";
+import { openReport, reportDocument } from "../lib/report";
 import { ContinuingAdmission } from "./ContinuingAdmission";
 
 const inr = (v?: string | number) => "₹" + Number(v ?? 0).toLocaleString("en-IN");
@@ -15,7 +17,11 @@ interface Dash {
   persona?: string;
   guardians: { name: string; relation: string; phone?: string; email?: string }[];
   fees: { billed?: string; paid?: string; balance: string; invoices?: number; pending?: boolean };
-  invoices?: { invoice_no: string; net: string; paid: string; status: string; due_date?: string }[];
+  invoices?: {
+    invoice_no: string; net: string; paid: string; status: string; due_date?: string;
+    academic_year?: string; installment?: string; government_aid?: string;
+    components?: { head: string; gross: string; aid: string; net: string }[];
+  }[];
   payments?: { id: string; receipt_no: string; amount: string; method: string; paid_at?: string }[];
   attendance: Record<string, number>;
   marks: { exam: string; subject: string; marks: string; max: string; grade?: string }[];
@@ -30,30 +36,28 @@ interface Dash {
   announcements: { title: string; body?: string; date?: string }[];
 }
 
-/** Open a printable fee receipt in a new window. */
-function printReceipt(studentName: string, p: { receipt_no: string; amount: string; method: string; paid_at?: string }) {
-  const w = window.open("", "_blank", "width=520,height=640");
-  if (!w) return;
-  w.document.write(`
-    <html><head><title>Receipt ${p.receipt_no}</title>
-    <style>body{font-family:system-ui,sans-serif;padding:32px;color:#1e293b}
-    h1{font-size:18px;margin:0}.muted{color:#64748b;font-size:12px}
-    table{width:100%;border-collapse:collapse;margin-top:20px;font-size:14px}
-    td{padding:8px 0;border-bottom:1px solid #e2e8f0}.r{text-align:right}
-    .total{font-size:20px;font-weight:700;margin-top:16px}</style></head>
-    <body>
-      <h1>SumayaEDU360 — Fee Receipt</h1>
-      <div class="muted">Receipt No: ${p.receipt_no}</div>
-      <table>
-        <tr><td>Student</td><td class="r">${studentName}</td></tr>
-        <tr><td>Date</td><td class="r">${p.paid_at ?? "—"}</td></tr>
-        <tr><td>Method</td><td class="r">${p.method.toUpperCase()}</td></tr>
-      </table>
-      <div class="total">Amount Paid: ₹${Number(p.amount).toLocaleString("en-IN")}</div>
-      <p class="muted" style="margin-top:32px">This is a computer-generated receipt.</p>
-      <script>window.print()</script>
-    </body></html>`);
-  w.document.close();
+/** Open a branded, printable fee receipt in a new window. */
+function printReceipt(
+  brand: Branding,
+  studentName: string,
+  p: { receipt_no: string; amount: string; method: string; paid_at?: string },
+) {
+  const bodyHtml = `
+    <table>
+      <tr><td>Receipt No</td><td class="r">${p.receipt_no}</td></tr>
+      <tr><td>Student</td><td class="r">${studentName}</td></tr>
+      <tr><td>Date</td><td class="r">${p.paid_at ?? "—"}</td></tr>
+      <tr><td>Method</td><td class="r">${p.method.toUpperCase()}</td></tr>
+    </table>
+    <div class="total">Amount Paid: ₹${Number(p.amount).toLocaleString("en-IN")}</div>
+    <p class="muted" style="margin-top:28px">This is a computer-generated receipt.</p>`;
+  const extraCss = `
+    table{margin-top:8px}
+    td{border:none;border-bottom:1px solid #e2e8f0;padding:8px 0}
+    .r{text-align:right;font-weight:600}
+    .muted{color:#64748b;font-size:12px}
+    .total{font-size:20px;font-weight:700;margin-top:16px}`;
+  openReport(reportDocument({ brand, title: "Fee Receipt", bodyHtml, extraCss }));
 }
 
 interface HomeworkItem {
@@ -208,7 +212,7 @@ function Student360View({ childView }: { childView?: boolean }) {
           {data.marks.length > 0 && (
             <button
               className="btn-ghost px-2.5 py-1 text-xs text-brand-600"
-              onClick={() => printMarksheet(brand.institution_name, data.student as any, data.marks)}
+              onClick={() => printMarksheet(brand, data.student as any, data.marks)}
             >
               Download Marksheet
             </button>
@@ -274,6 +278,33 @@ function Student360View({ childView }: { childView?: boolean }) {
 
       {childView && (
         <div className="card overflow-hidden">
+          <div className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-600">
+            Session & Installment-wise Pending Fees
+          </div>
+          <div className="overflow-x-auto"><table className="w-full min-w-[850px] text-sm">
+            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+              <tr><th className="px-4 py-3">Invoice / Session</th><th className="px-4 py-3">Installment & Components</th><th className="px-4 py-3">Due Date</th><th className="px-4 py-3">Payable</th><th className="px-4 py-3">Government Aid</th><th className="px-4 py-3">Balance</th><th className="px-4 py-3">Status</th></tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {data.invoices?.map((invoice) => (
+                <tr key={invoice.invoice_no}>
+                  <td className="px-4 py-2.5 font-medium">{invoice.invoice_no}<div className="text-xs font-normal text-slate-400">{invoice.academic_year}</div></td>
+                  <td className="px-4 py-2.5">{invoice.installment || "Annual"}<div className="max-w-xs text-xs text-slate-400">{invoice.components?.map((component) => component.head).join(", ")}</div></td>
+                  <td className="px-4 py-2.5">{invoice.due_date || "—"}</td>
+                  <td className="px-4 py-2.5">{inr(invoice.net)}</td>
+                  <td className="px-4 py-2.5 text-emerald-600">{inr(invoice.government_aid)}</td>
+                  <td className="px-4 py-2.5 font-medium">{inr(Number(invoice.net) - Number(invoice.paid))}</td>
+                  <td className="px-4 py-2.5 capitalize">{invoice.status}</td>
+                </tr>
+              ))}
+              {(!data.invoices || data.invoices.length === 0) && <tr><td colSpan={7} className="px-4 py-6 text-center text-slate-400">No fee installments assigned.</td></tr>}
+            </tbody>
+          </table></div>
+        </div>
+      )}
+
+      {childView && (
+        <div className="card overflow-hidden">
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
             <span className="text-sm font-semibold text-slate-600">Fee Payments & Receipts</span>
             <span className="text-xs text-slate-400">Balance due {inr(data.fees.balance)}</span>
@@ -296,7 +327,7 @@ function Student360View({ childView }: { childView?: boolean }) {
                   <td className="px-4 py-2.5 uppercase">{p.method}</td>
                   <td className="px-4 py-2.5">{inr(p.amount)}</td>
                   <td className="px-4 py-2.5 text-right">
-                    <button className="btn-ghost px-2.5 py-1 text-xs text-brand-600" onClick={() => printReceipt(data.student.name, p)}>
+                    <button className="btn-ghost px-2.5 py-1 text-xs text-brand-600" onClick={() => printReceipt(brand, data.student.name, p)}>
                       Download Receipt
                     </button>
                   </td>
@@ -486,6 +517,7 @@ export function StudentPortal() {
         { label: "Homework", icon: "edit", to: "homework" },
         { label: "Timetable", icon: "table", to: "timetable" },
         { label: "Activities", icon: "activity", to: "activities" },
+        { label: "Help Desk", icon: "shield", to: "helpdesk" },
         { label: "Next Admission", icon: "school", to: "admission" },
         { label: "Profile", icon: "users", to: "profile" },
       ]}
@@ -495,6 +527,7 @@ export function StudentPortal() {
         <Route path="homework" element={<HomeworkList />} />
         <Route path="timetable" element={<TimetableView />} />
         <Route path="activities" element={<ActivitiesView />} />
+        <Route path="helpdesk" element={<ComplaintsPanel canRaise />} />
         <Route path="admission" element={<ContinuingAdmission />} />
         <Route path="profile" element={<GuardiansResults />} />
         <Route path="*" element={<Navigate to="" replace />} />
@@ -513,7 +546,9 @@ export function ParentPortal() {
         { label: "Homework", icon: "edit", to: "homework" },
         { label: "Timetable", icon: "table", to: "timetable" },
         { label: "Activities", icon: "activity", to: "activities" },
-        { label: "Guardians", icon: "shield", to: "guardians" },
+        { label: "Meetings", icon: "calendar", to: "meetings" },
+        { label: "Help Desk", icon: "shield", to: "helpdesk" },
+        { label: "Guardians", icon: "users", to: "guardians" },
       ]}
     >
       <Routes>
@@ -521,6 +556,8 @@ export function ParentPortal() {
         <Route path="homework" element={<HomeworkList readonly />} />
         <Route path="timetable" element={<TimetableView />} />
         <Route path="activities" element={<ActivitiesView readonly />} />
+        <Route path="meetings" element={<MeetingsPanel isFamily />} />
+        <Route path="helpdesk" element={<ComplaintsPanel canRaise />} />
         <Route path="guardians" element={<GuardiansResults />} />
         <Route path="*" element={<Navigate to="" replace />} />
       </Routes>
@@ -1481,6 +1518,143 @@ export function StaffSelfAttendance() {
   );
 }
 
+// ---------------------------------------------------------------- Teacher: homework allocation
+interface TeacherHomeworkRow {
+  id: string; title: string; description?: string | null;
+  subject: string; grade: string; section?: string | null;
+  assigned_date?: string | null; due_date?: string | null;
+  max_marks: string; status: string;
+}
+
+function TeacherHomework() {
+  const qc = useQueryClient();
+  const { data: options } = useQuery({
+    queryKey: ["teacher-plan-options"],
+    queryFn: async () => (await api.get<PlanOptions>("/portal/teacher/plan-options")).data,
+  });
+  const { data: list, isLoading } = useQuery({
+    queryKey: ["teacher-homework"],
+    queryFn: async () => (await api.get<TeacherHomeworkRow[]>("/portal/teacher/homework")).data,
+  });
+
+  const today = new Date().toISOString().slice(0, 10);
+  const emptyForm = () => ({ classKey: "", title: "", assigned_date: today, due_date: "", description: "", max_marks: "10" });
+  const [form, setForm] = useState(emptyForm());
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function create() {
+    if (!form.title.trim()) { setError("Enter a homework title."); return; }
+    const [grade_id, section_id, subject_id] = form.classKey ? form.classKey.split("|") : ["", "", ""];
+    setBusy(true);
+    setError("");
+    try {
+      await api.post("/portal/teacher/homework", {
+        title: form.title.trim(),
+        grade_id: grade_id || null,
+        section_id: section_id || null,
+        subject_id: subject_id || null,
+        assigned_date: form.assigned_date || null,
+        due_date: form.due_date || null,
+        description: form.description.trim() || null,
+        max_marks: Number(form.max_marks) || 0,
+      });
+      setForm(emptyForm());
+      await qc.invalidateQueries({ queryKey: ["teacher-homework"] });
+    } catch (e) {
+      setError(apiError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(id: string) {
+    if (!window.confirm("Remove this homework? Students will no longer see it.")) return;
+    try {
+      await api.delete(`/portal/teacher/homework/${id}`);
+      await qc.invalidateQueries({ queryKey: ["teacher-homework"] });
+    } catch (e) {
+      alert(apiError(e));
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="card p-5">
+        <div className="mb-1">
+          <h2 className="font-semibold">Assign Homework</h2>
+          <p className="text-sm text-slate-400">
+            Pick a class to target its students, or leave it on “All classes” to reach every student.
+            Set the day it is assigned and the submission (due) date.
+          </p>
+        </div>
+        {error && <div className="my-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>}
+        <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+          <label className="lg:col-span-2"><span className="label">Class & Subject</span>
+            <select className="input" value={form.classKey} onChange={(e) => setForm({ ...form, classKey: e.target.value })}>
+              <option value="">All classes (whole school)</option>
+              {options?.classes.map((c) => {
+                const key = [c.grade_id ?? "", c.section_id ?? "", c.subject_id ?? ""].join("|");
+                return <option key={key} value={key}>{c.grade} / {c.section} · {c.subject}</option>;
+              })}
+            </select></label>
+          <label><span className="label">Max Marks</span>
+            <input className="input" type="number" min="0" value={form.max_marks} onChange={(e) => setForm({ ...form, max_marks: e.target.value })} /></label>
+          <label className="lg:col-span-3"><span className="label">Homework Title</span>
+            <input className="input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Chapter 4 — Exercise 4.2 (Q1–Q10)" /></label>
+          <label><span className="label">Assigned Date</span>
+            <input className="input" type="date" value={form.assigned_date} onChange={(e) => setForm({ ...form, assigned_date: e.target.value })} /></label>
+          <label><span className="label">Submission (Due) Date</span>
+            <input className="input" type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></label>
+          <label className="lg:col-span-3"><span className="label">Details / Instructions</span>
+            <textarea className="input min-h-20" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="What students need to do, references, etc." /></label>
+        </div>
+        <div className="mt-4">
+          <button className="btn-primary" disabled={busy} onClick={() => void create()}>{busy ? "Assigning…" : "Assign homework"}</button>
+        </div>
+      </div>
+
+      <div className="card overflow-hidden">
+        <div className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-600">Assigned Homework</div>
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+            <tr>
+              <th className="px-4 py-3">Title</th>
+              <th className="px-4 py-3">Class</th>
+              <th className="px-4 py-3">Subject</th>
+              <th className="px-4 py-3">Assigned</th>
+              <th className="px-4 py-3">Due</th>
+              <th className="px-4 py-3">Marks</th>
+              <th className="px-4 py-3" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {list?.map((h) => (
+              <tr key={h.id} className="hover:bg-slate-50">
+                <td className="px-4 py-2.5">
+                  <div className="font-medium">{h.title}</div>
+                  {h.description && <div className="text-xs text-slate-400">{h.description}</div>}
+                </td>
+                <td className="px-4 py-2.5">{h.grade}{h.section ? ` / ${h.section}` : ""}</td>
+                <td className="px-4 py-2.5">{h.subject}</td>
+                <td className="px-4 py-2.5">{h.assigned_date || "—"}</td>
+                <td className="px-4 py-2.5">{h.due_date || "—"}</td>
+                <td className="px-4 py-2.5">{h.max_marks}</td>
+                <td className="px-4 py-2.5 text-right">
+                  <button className="btn-ghost px-2.5 py-1 text-xs text-rose-500" onClick={() => void remove(h.id)}>Remove</button>
+                </td>
+              </tr>
+            ))}
+            {!isLoading && (!list || list.length === 0) && (
+              <tr><td colSpan={7} className="px-4 py-6 text-center text-slate-400">No homework assigned yet.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export function TeacherPortal() {
   return (
     <PortalShell
@@ -1493,7 +1667,10 @@ export function TeacherPortal() {
         { label: "Lesson Planning", icon: "book", to: "plans" },
         { label: "Plan Approvals", icon: "shield", to: "plan-reviews" },
         { label: "Student Marks", icon: "trending-up", to: "marks" },
-        { label: "Grade Homework", icon: "edit", to: "submissions" },
+        { label: "Assign Homework", icon: "edit", to: "homework" },
+        { label: "Grade Homework", icon: "check-square", to: "submissions" },
+        { label: "Meetings", icon: "users", to: "meetings" },
+        { label: "Complaints", icon: "shield", to: "complaints" },
         { label: "Marks Review", icon: "activity", to: "marks-review" },
       ]}
     >
@@ -1505,7 +1682,10 @@ export function TeacherPortal() {
         <Route path="plans" element={<TeacherPlans />} />
         <Route path="plan-reviews" element={<TeacherPlanReviews />} />
         <Route path="marks" element={<TeacherMarks />} />
+        <Route path="homework" element={<TeacherHomework />} />
         <Route path="submissions" element={<TeacherSubmissions />} />
+        <Route path="meetings" element={<MeetingsPanel canSchedule />} />
+        <Route path="complaints" element={<ComplaintsPanel canManage />} />
         <Route path="marks-review" element={<TeacherMarksReview />} />
         <Route path="*" element={<Navigate to="" replace />} />
       </Routes>

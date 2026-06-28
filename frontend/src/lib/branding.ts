@@ -6,6 +6,10 @@ export interface Branding {
   logo_url: string;
   tagline: string;
   primary_color: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
 }
 
 const FALLBACK: Branding = {
@@ -13,6 +17,10 @@ const FALLBACK: Branding = {
   logo_url: "",
   tagline: "AI EduOS",
   primary_color: "#2563eb",
+  address: "",
+  phone: "",
+  email: "",
+  website: "",
 };
 
 /** Tenant branding (logo, name, theme) — public endpoint, cached for the session. */

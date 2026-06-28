@@ -11,6 +11,7 @@ from app.api.v1 import (
     curriculum,
     documents,
     dynamic,
+    engagement,
     entities,
     exams,
     fees,
@@ -37,6 +38,7 @@ api_router.include_router(documents.router)
 api_router.include_router(public_site.router)
 api_router.include_router(portal.router)
 api_router.include_router(curriculum.router)      # quarterly plan oversight + approval
+api_router.include_router(engagement.router)      # parent-teacher meetings + complaints
 api_router.include_router(meta.router)
 api_router.include_router(masters.router)
 api_router.include_router(users.router)

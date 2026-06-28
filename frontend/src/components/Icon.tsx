@@ -14,6 +14,7 @@ const PATHS: Record<string, string> = {
   activity: "M22 12h-4l-3 9L9 3l-3 9H2",
   cube: "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z M3.27 6.96L12 12l8.73-5.04 M12 22V12",
   table: "M3 3h18v18H3z M3 9h18 M3 15h18 M9 3v18",
+  calendar: "M3 4h18v18H3z M16 2v4 M8 2v4 M3 10h18",
   check: "M20 6L9 17l-5-5",
   logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4 M16 17l5-5-5-5 M21 12H9",
 };

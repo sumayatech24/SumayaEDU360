@@ -1,12 +1,75 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, apiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import { endpointFor } from "../lib/resources";
-import type { EntityDef, Page } from "../lib/types";
+import { useBranding } from "../lib/branding";
+import { endpointFor, rowLabel } from "../lib/resources";
+import { exportCsv, exportExcel, exportPdf, type ExportColumn, type ExportRow } from "../lib/export";
+import type { EntityDef, FieldDef, Page } from "../lib/types";
 import { EntityForm } from "./EntityForm";
 import { Modal } from "./Modal";
+
+/** Build id→label and code→label lookups so list cells render real names
+ *  instead of the raw UUIDs / codes stored on each record. */
+function useDisplayMaps(listFields: FieldDef[]) {
+  const refSlugs = useMemo(
+    () => [...new Set(listFields.filter((f) => f.reference_entity).map((f) => f.reference_entity!))],
+    [listFields],
+  );
+  const masterTypes = useMemo(
+    () => [...new Set(listFields.filter((f) => f.options_master).map((f) => f.options_master!))],
+    [listFields],
+  );
+
+  // Definitions of the referenced entities (needed to label their rows + find their endpoint).
+  const refEntities = useQueries({
+    queries: refSlugs.map((slug) => ({
+      queryKey: ["entity", slug],
+      queryFn: async () => (await api.get<EntityDef>(`/entities/${slug}`)).data,
+      staleTime: 5 * 60_000,
+    })),
+  });
+  // The referenced collections themselves.
+  const refCollections = useQueries({
+    queries: refSlugs.map((slug, i) => {
+      const ent = refEntities[i].data;
+      const ep = ent ? endpointFor(ent) : null;
+      return {
+        queryKey: ["ref-options", slug],
+        enabled: !!ep,
+        staleTime: 5 * 60_000,
+        queryFn: async () => (await api.get<Page<any>>(ep!.base, { params: { page_size: 500 } })).data,
+      };
+    }),
+  });
+  const masterValues = useQueries({
+    queries: masterTypes.map((type) => ({
+      queryKey: ["master-values", type],
+      queryFn: async () =>
+        (await api.get<{ code: string; label: string }[]>(`/master-types/${type}/values`)).data,
+      staleTime: 5 * 60_000,
+    })),
+  });
+
+  return useMemo(() => {
+    const refs: Record<string, Record<string, string>> = {};
+    refSlugs.forEach((slug, i) => {
+      const ent = refEntities[i].data;
+      const map: Record<string, string> = {};
+      (refCollections[i].data?.items ?? []).forEach((row: any) => {
+        map[row.id] = rowLabel(ent, row);
+      });
+      refs[slug] = map;
+    });
+    const masters: Record<string, Record<string, string>> = {};
+    masterTypes.forEach((type, i) => {
+      masters[type] = Object.fromEntries((masterValues[i].data ?? []).map((v) => [v.code, v.label]));
+    });
+    return { refs, masters };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refSlugs, masterTypes, refEntities.map((q) => q.data), refCollections.map((q) => q.data), masterValues.map((q) => q.data)]);
+}
 
 export interface RowAction {
   label: string;
@@ -30,6 +93,7 @@ interface Props {
 export function ResourcePage({ entitySlug, permPrefix, title, hideCreate, rowActions, viewPath }: Props) {
   const qc = useQueryClient();
   const { can } = useAuth();
+  const brand = useBranding();
   const [page, setPage] = useState(1);
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<Record<string, any> | null>(null);
@@ -56,6 +120,7 @@ export function ResourcePage({ entitySlug, permPrefix, title, hideCreate, rowAct
 
   const fields = entity?.fields ?? [];
   const listFields = useMemo(() => fields.filter((f) => f.is_list_visible), [fields]);
+  const displayMaps = useDisplayMaps(listFields);
 
   function rowData(row: any): Record<string, any> {
     return ep?.generic ? row.data ?? {} : row;
@@ -99,6 +164,39 @@ export function ResourcePage({ entitySlug, permPrefix, title, hideCreate, rowAct
   const canCreate = !hideCreate && (!permPrefix || can(`${permPrefix}:create`));
   const canDelete = !permPrefix || can(`${permPrefix}:delete`);
 
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  async function runExport(kind: "csv" | "excel" | "pdf") {
+    if (!ep) return;
+    setExportOpen(false);
+    setExporting(true);
+    try {
+      // Pull the full (filtered) result set, not just the visible page.
+      const { data } = await api.get<Page<any>>(ep.base, { params: { page_size: 1000, q: q || undefined } });
+      const items = data.items ?? [];
+      const columns: ExportColumn[] = listFields.map((f) => ({ key: f.name, label: f.label }));
+      const rows: ExportRow[] = items.map((it: any) => {
+        const d = rowData(it);
+        const out: ExportRow = {};
+        listFields.forEach((f) => {
+          out[f.name] = resolveCellText(d[f.name], f, displayMaps);
+        });
+        return out;
+      });
+      const name = title || entity?.name || "Records";
+      if (kind === "csv") exportCsv(name, columns, rows);
+      else if (kind === "excel") exportExcel(name, columns, rows);
+      else exportPdf(name, columns, rows, brand);
+    } catch (e) {
+      alert(apiError(e));
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  const hasRows = (pageData?.total ?? 0) > 0;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -116,6 +214,30 @@ export function ResourcePage({ entitySlug, permPrefix, title, hideCreate, rowAct
               setQ(e.target.value);
             }}
           />
+          <div className="relative">
+            <button
+              className="btn-ghost border border-slate-200"
+              disabled={!hasRows || exporting}
+              onClick={() => setExportOpen((o) => !o)}
+            >
+              {exporting ? "Exporting…" : "Export ▾"}
+            </button>
+            {exportOpen && (
+              <>
+                <button
+                  type="button"
+                  className="fixed inset-0 z-10 cursor-default"
+                  aria-label="Close export menu"
+                  onClick={() => setExportOpen(false)}
+                />
+                <div className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+                  <button className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50" onClick={() => void runExport("csv")}>CSV (.csv)</button>
+                  <button className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50" onClick={() => void runExport("excel")}>Excel (.xls)</button>
+                  <button className="block w-full px-4 py-2 text-left text-sm hover:bg-slate-50" onClick={() => void runExport("pdf")}>PDF (print)</button>
+                </div>
+              </>
+            )}
+          </div>
           {canCreate && (
             <button
               className="btn-primary"
@@ -163,7 +285,7 @@ export function ResourcePage({ entitySlug, permPrefix, title, hideCreate, rowAct
                 <tr key={row.id} className="hover:bg-slate-50">
                   {listFields.map((f) => (
                     <td key={f.name} className="px-4 py-3">
-                      {formatCell(d[f.name])}
+                      {formatCell(d[f.name], f, displayMaps)}
                     </td>
                   ))}
                   <td className="px-4 py-3 text-right">
@@ -264,9 +386,30 @@ export function ResourcePage({ entitySlug, permPrefix, title, hideCreate, rowAct
   );
 }
 
-function formatCell(v: any) {
-  if (v === null || v === undefined || v === "") return <span className="text-slate-300">—</span>;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type DisplayMaps = { refs: Record<string, Record<string, string>>; masters: Record<string, Record<string, string>> };
+
+/** Resolve a stored value to its human-readable text (FK→name, code→label). */
+function resolveCellText(v: any, field?: FieldDef, maps?: DisplayMaps): string {
+  if (v === null || v === undefined || v === "") return "";
   if (typeof v === "boolean") return v ? "Yes" : "No";
+  if (field?.reference_entity && maps?.refs[field.reference_entity]?.[String(v)]) {
+    return maps.refs[field.reference_entity][String(v)];
+  }
+  if (field?.options_master && maps?.masters[field.options_master]?.[String(v)]) {
+    return maps.masters[field.options_master][String(v)];
+  }
   if (typeof v === "object") return JSON.stringify(v);
   return String(v);
+}
+
+function formatCell(v: any, field?: FieldDef, maps?: DisplayMaps) {
+  if (v === null || v === undefined || v === "") return <span className="text-slate-300">—</span>;
+  const text = resolveCellText(v, field, maps);
+  // Last resort: never show a bare UUID — shorten it.
+  if (typeof v === "string" && UUID_RE.test(v) && text === v) {
+    return <span className="font-mono text-xs text-slate-400">{v.slice(0, 8)}…</span>;
+  }
+  return text;
 }

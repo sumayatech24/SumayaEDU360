@@ -215,8 +215,8 @@ async def save_marks_sheet(
     batch = await _get_or_create_batch(
         db, user, exam_id, payload.subject_id, payload.grade_id, payload.section_id, payload.reviewer_id
     )
-    if batch.batch_status in ("submitted", "approved", "published"):
-        raise HTTPException(409, "Submitted/approved marks cannot be changed unless rejected")
+    if batch.batch_status in ("approved", "published"):
+        raise HTTPException(409, "Approved marks are locked and cannot be changed")
     written = await _write_marks(db, user, exam_id, payload.entries)
     batch.batch_status = "draft"
     batch.updated_by = user.id

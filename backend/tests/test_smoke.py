@@ -235,6 +235,121 @@ async def test_marksheet_lifecycle_and_student_visibility(client):
 
 
 @pytest.mark.asyncio
+async def test_teacher_bulk_marks_entry_and_hod_lock(client):
+    teacher = await _login(client, "teacher@sumaya.edu", "Teacher@123")
+    options = await client.get("/api/v1/portal/teacher/marks-entry-options", headers=teacher)
+    assert options.status_code == 200, options.text
+    assignments = options.json()["assignments"]
+    assert assignments
+    admin = await _login(client, "admin@sumaya.edu", "Admin@123")
+    new_exam = await client.post(
+        "/api/v1/exams",
+        headers=admin,
+        json={
+            "name": "Bulk Entry Workflow Test",
+            "code": "BULK-WF",
+            "exam_type": "internal",
+            "grade_id": assignments[0]["grade_id"],
+            "max_marks": 50,
+            "pass_marks": 17,
+        },
+    )
+    assert new_exam.status_code == 201, new_exam.text
+    exam_id = new_exam.json()["id"]
+    options = await client.get("/api/v1/portal/teacher/marks-entry-options", headers=teacher)
+    assignments = options.json()["assignments"]
+
+    selected = None
+    sheet_data = None
+    for assignment in assignments:
+        for exam in [item for item in assignment["exams"] if item["id"] == exam_id]:
+            sheet = await client.get(
+                "/api/v1/portal/teacher/marks-sheet",
+                params={"assignment_id": assignment["id"], "exam_id": exam["id"]},
+                headers=teacher,
+            )
+            assert sheet.status_code == 200, sheet.text
+            if sheet.json()["rows"] and (not sheet.json()["batch"] or sheet.json()["batch"]["status"] not in ("approved", "published")):
+                selected = (assignment, exam)
+                sheet_data = sheet.json()
+                break
+        if selected:
+            break
+    assert selected and sheet_data
+    assignment, exam = selected
+    rows = sheet_data["rows"]
+    maximum = float(sheet_data["max_marks"])
+
+    invalid = await client.post(
+        "/api/v1/portal/teacher/marks-sheet",
+        headers=teacher,
+        json={
+            "assignment_id": assignment["id"],
+            "exam_id": exam["id"],
+            "entries": [{"student_id": rows[0]["student_id"], "marks_obtained": maximum + 1}],
+        },
+    )
+    assert invalid.status_code == 422, invalid.text
+
+    draft = await client.post(
+        "/api/v1/portal/teacher/marks-sheet",
+        headers=teacher,
+        json={
+            "assignment_id": assignment["id"],
+            "exam_id": exam["id"],
+            "entries": [{"student_id": rows[0]["student_id"], "marks_obtained": maximum - 5}],
+        },
+    )
+    assert draft.status_code == 200, draft.text
+    assert draft.json()["status"] == "draft"
+
+    incomplete = await client.post(
+        "/api/v1/portal/teacher/marks-sheet/submit",
+        headers=teacher,
+        json={
+            "assignment_id": assignment["id"],
+            "exam_id": exam["id"],
+            "entries": [{"student_id": rows[0]["student_id"], "marks_obtained": maximum - 5}],
+        },
+    )
+    assert incomplete.status_code == 422, incomplete.text
+
+    entries = [
+        {"student_id": row["student_id"], "marks_obtained": maximum - (index % 10), "is_absent": False}
+        for index, row in enumerate(rows)
+    ]
+    submitted = await client.post(
+        "/api/v1/portal/teacher/marks-sheet/submit",
+        headers=teacher,
+        json={"assignment_id": assignment["id"], "exam_id": exam["id"], "entries": entries},
+    )
+    assert submitted.status_code == 200, submitted.text
+    assert submitted.json()["status"] == "submitted"
+    batch_id = submitted.json()["id"]
+
+    hod = await _login(client, "hod@sumaya.edu", "Hod@123")
+    queue = await client.get("/api/v1/portal/teacher/marks-review", headers=hod)
+    assert queue.status_code == 200, queue.text
+    assert batch_id in {item["id"] for item in queue.json()}
+    review_sheet = await client.get(f"/api/v1/portal/teacher/marks-review/{batch_id}", headers=hod)
+    assert review_sheet.status_code == 200, review_sheet.text
+    assert len(review_sheet.json()["rows"]) == len(rows)
+    approved = await client.post(
+        f"/api/v1/portal/teacher/marks-review/{batch_id}",
+        headers=hod,
+        json={"decision": "approved", "review_note": "Verified"},
+    )
+    assert approved.status_code == 200, approved.text
+
+    locked = await client.post(
+        "/api/v1/portal/teacher/marks-sheet",
+        headers=teacher,
+        json={"assignment_id": assignment["id"], "exam_id": exam["id"], "entries": entries},
+    )
+    assert locked.status_code == 409, locked.text
+
+
+@pytest.mark.asyncio
 async def test_complete_new_admission_lifecycle(client):
     config = (await client.get("/api/v1/public/admissions/SUMAYA/config")).json()
     grade = config["grades"][0]

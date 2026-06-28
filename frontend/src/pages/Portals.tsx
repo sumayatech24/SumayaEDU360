@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { Icon } from "../components/Icon";
 import { PortalShell } from "../components/PortalShell";
@@ -765,23 +765,92 @@ function TeacherSchedule() {
 }
 
 function TeacherMarksReview() {
+  const qc = useQueryClient();
+  const [selected, setSelected] = useState("");
+  const [note, setNote] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
   const { data } = useQuery({
     queryKey: ["portal-teacher-marks-review"],
     queryFn: async () => (await api.get<any[]>("/portal/teacher/marks-review")).data,
   });
+  const sheet = useQuery({
+    queryKey: ["portal-teacher-marks-review-sheet", selected],
+    enabled: !!selected,
+    queryFn: async () => (await api.get<any>(`/portal/teacher/marks-review/${selected}`)).data,
+  });
+
+  async function review(decision: "approved" | "rejected") {
+    if (!selected) return;
+    if (decision === "rejected" && !note.trim()) {
+      setError("Please enter a reason before returning marks to the teacher.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      await api.post(`/portal/teacher/marks-review/${selected}`, { decision, review_note: note.trim() || null });
+      setSelected("");
+      setNote("");
+      await qc.invalidateQueries({ queryKey: ["portal-teacher-marks-review"] });
+    } catch (e) {
+      setError(apiError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
-    <div className="card overflow-hidden">
-      <table className="w-full text-sm">
-        <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-          <tr><th className="px-4 py-3">Exam</th><th className="px-4 py-3">Subject</th><th className="px-4 py-3">Class</th><th className="px-4 py-3">Status</th><th className="px-4 py-3">Note</th></tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {data?.map((b) => (
-            <tr key={b.id}><td className="px-4 py-2.5">{b.exam}</td><td className="px-4 py-2.5">{b.subject}</td><td className="px-4 py-2.5">{b.grade}/{b.section}</td><td className="px-4 py-2.5 capitalize">{b.status}</td><td className="px-4 py-2.5">{b.review_note || "--"}</td></tr>
-          ))}
-          {(!data || data.length === 0) && <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">No marks batches assigned for review.</td></tr>}
-        </tbody>
-      </table>
+    <div className="space-y-4">
+      <div className="card overflow-hidden">
+        <div className="border-b border-slate-100 px-4 py-3">
+          <h2 className="font-semibold">HOD Marks Approval</h2>
+          <p className="text-xs text-slate-400">Open a submitted class marksheet, verify the complete roster, then approve or return it.</p>
+        </div>
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+            <tr><th className="px-4 py-3">Exam</th><th className="px-4 py-3">Subject</th><th className="px-4 py-3">Class</th><th className="px-4 py-3">Status</th><th className="px-4 py-3"></th></tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {data?.map((b) => (
+              <tr key={b.id} className={selected === b.id ? "bg-indigo-50" : ""}>
+                <td className="px-4 py-2.5">{b.exam}</td><td className="px-4 py-2.5">{b.subject}</td>
+                <td className="px-4 py-2.5">{b.grade}/{b.section}</td>
+                <td className="px-4 py-2.5 capitalize">{b.status}</td>
+                <td className="px-4 py-2.5 text-right"><button className="btn-ghost" onClick={() => { setSelected(b.id); setNote(b.review_note || ""); }}>Review</button></td>
+              </tr>
+            ))}
+            {(!data || data.length === 0) && <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">No marks batches assigned for review.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {selected && (
+        <div className="card overflow-hidden">
+          <div className="border-b border-slate-100 px-4 py-3 font-semibold">Complete class marksheet</div>
+          <div className="max-h-[430px] overflow-auto">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                <tr><th className="px-4 py-3">Roll</th><th className="px-4 py-3">Student</th><th className="px-4 py-3">Marks</th><th className="px-4 py-3">Grade</th></tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {sheet.data?.rows.map((r: any) => (
+                  <tr key={r.student_id}><td className="px-4 py-2.5">{r.roll_no || r.admission_no}</td><td className="px-4 py-2.5 font-medium">{r.student_name}</td><td className="px-4 py-2.5">{r.is_absent ? "Absent" : `${r.marks_obtained} / ${r.max_marks}`}</td><td className="px-4 py-2.5">{r.grade || "--"}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {sheet.data?.status === "submitted" && (
+            <div className="space-y-3 border-t border-slate-100 p-4">
+              <label><span className="label">HOD note</span><textarea className="input min-h-20" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional for approval; required when returning" /></label>
+              {error && <div className="text-sm text-rose-600">{error}</div>}
+              <div className="flex gap-2">
+                <button className="btn-primary" disabled={busy} onClick={() => void review("approved")}>Approve & lock marks</button>
+                <button className="btn-ghost border border-rose-200 text-rose-600" disabled={busy} onClick={() => void review("rejected")}>Return to teacher</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -1040,7 +1109,7 @@ function TeacherPlanReviews() {
   );
 }
 
-function TeacherMarks() {
+function TeacherMarksLegacy() {
   const [exam, setExam] = useState("");
   const [subject, setSubject] = useState("");
   const { data } = useQuery({
@@ -1094,6 +1163,180 @@ function TeacherMarks() {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function TeacherMarks() {
+  interface MarkAssignment {
+    id: string; grade: string; section: string; subject: string; reviewer?: string | null;
+    exams: { id: string; name: string; code: string }[];
+  }
+  interface MarkRow {
+    student_id: string; admission_no: string; roll_no?: string | null; student_name: string;
+    marks_obtained: string; is_absent: boolean; remarks?: string; grade?: string | null;
+  }
+  interface MarkSheet {
+    max_marks: string;
+    batch?: { id: string; status: string; review_note?: string | null } | null;
+    rows: MarkRow[];
+  }
+
+  const qc = useQueryClient();
+  const [assignmentId, setAssignmentId] = useState("");
+  const [examId, setExamId] = useState("");
+  const [rows, setRows] = useState<MarkRow[]>([]);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const { data: options } = useQuery({
+    queryKey: ["teacher-marks-entry-options"],
+    queryFn: async () => (await api.get<{ assignments: MarkAssignment[] }>("/portal/teacher/marks-entry-options")).data,
+  });
+  const assignment = options?.assignments.find((a) => a.id === assignmentId);
+  const sheet = useQuery({
+    queryKey: ["teacher-marks-sheet", assignmentId, examId],
+    enabled: !!assignmentId && !!examId,
+    queryFn: async () => (await api.get<MarkSheet>("/portal/teacher/marks-sheet", {
+      params: { assignment_id: assignmentId, exam_id: examId },
+    })).data,
+  });
+  useEffect(() => {
+    setRows(sheet.data?.rows ?? []);
+  }, [sheet.data]);
+
+  const maximum = Number(sheet.data?.max_marks ?? 0);
+  const locked = ["approved", "published"].includes(sheet.data?.batch?.status ?? "");
+  const invalidRows = rows.filter((r) => {
+    if (r.is_absent || r.marks_obtained === "") return false;
+    const value = Number(r.marks_obtained);
+    return !Number.isFinite(value) || value < 0 || value > maximum;
+  });
+  const completed = rows.filter((r) => r.is_absent || r.marks_obtained !== "").length;
+
+  function payload() {
+    return {
+      assignment_id: assignmentId,
+      exam_id: examId,
+      entries: rows.map((r) => ({
+        student_id: r.student_id,
+        marks_obtained: r.is_absent || r.marks_obtained === "" ? null : Number(r.marks_obtained),
+        is_absent: r.is_absent,
+        remarks: r.remarks || null,
+      })),
+    };
+  }
+
+  async function save(submit: boolean) {
+    if (invalidRows.length) {
+      setError(`Correct ${invalidRows.length} mark value${invalidRows.length === 1 ? "" : "s"} outside 0-${maximum}.`);
+      return;
+    }
+    if (submit && completed !== rows.length) {
+      setError(`Complete all ${rows.length} students before submitting. ${rows.length - completed} still need marks or Absent.`);
+      return;
+    }
+    if (submit && !window.confirm(`Submit marks for all ${rows.length} students to ${assignment?.reviewer || "the HOD"}?`)) return;
+    setBusy(true);
+    setError("");
+    try {
+      await api.post(`/portal/teacher/marks-sheet${submit ? "/submit" : ""}`, payload());
+      setNotice(submit ? "Entire class marksheet submitted to the HOD." : `Draft saved for ${completed} of ${rows.length} students.`);
+      await qc.invalidateQueries({ queryKey: ["teacher-marks-sheet", assignmentId, examId] });
+      await qc.invalidateQueries({ queryKey: ["portal-teacher-marks-review"] });
+    } catch (e) {
+      setError(apiError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function changeRow(index: number, patch: Partial<MarkRow>) {
+    setRows((current) => current.map((row, i) => i === index ? { ...row, ...patch } : row));
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="card p-4">
+        <div className="mb-4">
+          <h2 className="font-semibold">Class Marks Entry</h2>
+          <p className="text-sm text-slate-400">Choose one of your assigned class-subjects. The complete student roster loads as one worksheet.</p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <label><span className="label">My class & subject</span>
+            <select className="input" value={assignmentId} onChange={(e) => { setAssignmentId(e.target.value); setExamId(""); setRows([]); }}>
+              <option value="">Select assigned class and subject</option>
+              {options?.assignments.map((a) => <option key={a.id} value={a.id}>{a.grade} / {a.section} — {a.subject}</option>)}
+            </select>
+          </label>
+          <label><span className="label">Examination</span>
+            <select className="input" value={examId} disabled={!assignment} onChange={(e) => { setExamId(e.target.value); setNotice(""); setError(""); }}>
+              <option value="">Select examination</option>
+              {assignment?.exams.map((e) => <option key={e.id} value={e.id}>{e.name} — {e.code}</option>)}
+            </select>
+          </label>
+        </div>
+        {options && options.assignments.length === 0 && (
+          <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">No active teacher-class-subject mapping exists. Ask the administrator to add it in Teacher Allocation.</div>
+        )}
+        {assignment && <div className="mt-3 text-xs text-slate-500">HOD/reviewer: <span className="font-medium text-slate-700">{assignment.reviewer || "Not mapped — update Teacher Allocation"}</span></div>}
+      </div>
+      {assignmentId && examId && (
+        <div className="card overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+            <div>
+              <div className="font-semibold">{assignment?.grade} / {assignment?.section} — {assignment?.subject}</div>
+              <div className="text-xs text-slate-400">{completed} of {rows.length} completed · Maximum {sheet.data?.max_marks ?? "--"} marks</div>
+            </div>
+            <span className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${locked ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+              {sheet.data?.batch?.status ?? "Not started"}
+            </span>
+          </div>
+          {sheet.data?.batch?.review_note && <div className="border-b border-amber-100 bg-amber-50 px-4 py-2 text-sm text-amber-700">HOD note: {sheet.data.batch.review_note}</div>}
+          {locked && <div className="border-b border-emerald-100 bg-emerald-50 px-4 py-2 text-sm text-emerald-700">Approved marks are locked. No further changes are allowed.</div>}
+          <div className="max-h-[560px] overflow-auto">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead className="sticky top-0 z-10 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                <tr><th className="px-4 py-3">Roll</th><th className="px-4 py-3">Student</th><th className="px-4 py-3">Marks</th><th className="px-4 py-3">Absent</th><th className="px-4 py-3">Remarks</th><th className="px-4 py-3">Grade</th></tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {rows.map((r, index) => {
+                  const value = Number(r.marks_obtained);
+                  const invalid = r.marks_obtained !== "" && (!Number.isFinite(value) || value < 0 || value > maximum);
+                  return (
+                    <tr key={r.student_id} className={invalid ? "bg-rose-50" : ""}>
+                      <td className="px-4 py-2.5 text-slate-500">{r.roll_no || r.admission_no}</td>
+                      <td className="px-4 py-2.5 font-medium">{r.student_name}<div className="text-xs font-normal text-slate-400">{r.admission_no}</div></td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-1">
+                          <input className={`input h-9 w-24 ${invalid ? "border-rose-400" : ""}`} type="number" min="0" max={maximum} step="0.01"
+                            disabled={locked || r.is_absent} value={r.marks_obtained}
+                            onChange={(e) => changeRow(index, { marks_obtained: e.target.value })} />
+                          <span className="text-xs text-slate-400">/ {sheet.data?.max_marks}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5"><input type="checkbox" disabled={locked} checked={r.is_absent} onChange={(e) => changeRow(index, { is_absent: e.target.checked, marks_obtained: e.target.checked ? "" : r.marks_obtained })} /></td>
+                      <td className="px-4 py-2.5"><input className="input h-9 min-w-48" disabled={locked} value={r.remarks || ""} onChange={(e) => changeRow(index, { remarks: e.target.value })} placeholder="Optional" /></td>
+                      <td className="px-4 py-2.5">{r.is_absent ? "AB" : r.grade || "--"}</td>
+                    </tr>
+                  );
+                })}
+                {!sheet.isLoading && rows.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-400">No students are enrolled in this class and section.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+          {!locked && rows.length > 0 && (
+            <div className="space-y-3 border-t border-slate-100 p-4">
+              {error && <div className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-600">{error}</div>}
+              {notice && <div className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{notice}</div>}
+              <div className="flex flex-wrap gap-2">
+                <button className="btn-ghost border border-slate-200" disabled={busy || invalidRows.length > 0} onClick={() => void save(false)}>Save draft</button>
+                <button className="btn-primary" disabled={busy || invalidRows.length > 0 || completed !== rows.length || !assignment?.reviewer} onClick={() => void save(true)}>Submit entire class to HOD</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

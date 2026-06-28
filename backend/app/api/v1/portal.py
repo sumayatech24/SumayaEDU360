@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, timezone
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -83,6 +84,24 @@ class PlanSubmitIn(BaseModel):
 
 class PlanReviewIn(BaseModel):
     decision: str  # approved / rejected
+    review_note: str | None = None
+
+
+class TeacherMarkEntryIn(BaseModel):
+    student_id: uuid.UUID
+    marks_obtained: Decimal | None = None
+    is_absent: bool = False
+    remarks: str | None = None
+
+
+class TeacherMarkSheetIn(BaseModel):
+    assignment_id: uuid.UUID
+    exam_id: uuid.UUID
+    entries: list[TeacherMarkEntryIn]
+
+
+class MarksReviewIn(BaseModel):
+    decision: str
     review_note: str | None = None
 
 
@@ -636,6 +655,390 @@ async def teacher_marks_review(
         }
         for b in rows
     ]
+
+
+def _mark_grade(marks: Decimal, maximum: Decimal, absent: bool) -> str:
+    if absent:
+        return "AB"
+    pct = float(marks / maximum * 100) if maximum else 0
+    if pct >= 90:
+        return "A+"
+    if pct >= 80:
+        return "A"
+    if pct >= 70:
+        return "B+"
+    if pct >= 60:
+        return "B"
+    if pct >= 50:
+        return "C"
+    if pct >= 40:
+        return "D"
+    return "E"
+
+
+async def _teacher_assignment(
+    db: AsyncSession, user: CurrentUser, assignment_id: uuid.UUID
+) -> tuple[uuid.UUID, TeacherAssignment]:
+    employee_id = await _linked_employee_id(db, user)
+    assignment = await db.get(TeacherAssignment, assignment_id)
+    today = date.today()
+    if (
+        not assignment
+        or assignment.tenant_id != user.tenant_id
+        or assignment.employee_id != employee_id
+        or assignment.assignment_status != "active"
+        or assignment.is_deleted
+        or (assignment.effective_from and assignment.effective_from > today)
+        or (assignment.effective_to and assignment.effective_to < today)
+    ):
+        raise HTTPException(403, "This class/subject is not assigned to the signed-in teacher")
+    if not assignment.grade_id or not assignment.section_id or not assignment.subject_id:
+        raise HTTPException(409, "Teacher assignment must include class, section and subject")
+    return employee_id, assignment
+
+
+async def _assignment_exam(
+    db: AsyncSession, user: CurrentUser, assignment: TeacherAssignment, exam_id: uuid.UUID
+) -> tuple[Exam, Decimal]:
+    exam = await db.get(Exam, exam_id)
+    if (
+        not exam
+        or exam.tenant_id != user.tenant_id
+        or exam.is_deleted
+        or (exam.grade_id and exam.grade_id != assignment.grade_id)
+    ):
+        raise HTTPException(404, "Exam is not available for this assigned class")
+    paper = (await db.execute(select(ExamSubject).where(
+        ExamSubject.tenant_id == user.tenant_id,
+        ExamSubject.exam_id == exam.id,
+        ExamSubject.subject_id == assignment.subject_id,
+        ExamSubject.grade_id == assignment.grade_id,
+        ExamSubject.section_id == assignment.section_id,
+        ExamSubject.is_deleted.is_(False),
+    ))).scalars().first()
+    return exam, Decimal(paper.max_marks if paper else exam.max_marks)
+
+
+async def _assignment_roster(
+    db: AsyncSession, user: CurrentUser, assignment: TeacherAssignment
+) -> list[Student]:
+    return (await db.execute(select(Student).where(
+        Student.tenant_id == user.tenant_id,
+        Student.grade_id == assignment.grade_id,
+        Student.section_id == assignment.section_id,
+        Student.is_deleted.is_(False),
+    ).order_by(Student.roll_no, Student.admission_no))).scalars().all()
+
+
+async def _marks_batch(
+    db: AsyncSession,
+    user: CurrentUser,
+    employee_id: uuid.UUID,
+    assignment: TeacherAssignment,
+    exam_id: uuid.UUID,
+    create: bool = False,
+) -> MarksBatch | None:
+    batch = (await db.execute(select(MarksBatch).where(
+        MarksBatch.tenant_id == user.tenant_id,
+        MarksBatch.exam_id == exam_id,
+        MarksBatch.subject_id == assignment.subject_id,
+        MarksBatch.grade_id == assignment.grade_id,
+        MarksBatch.section_id == assignment.section_id,
+        MarksBatch.is_deleted.is_(False),
+    ))).scalars().first()
+    if not batch and create:
+        batch = MarksBatch(
+            tenant_id=user.tenant_id,
+            exam_id=exam_id,
+            subject_id=assignment.subject_id,
+            grade_id=assignment.grade_id,
+            section_id=assignment.section_id,
+            teacher_id=employee_id,
+            reviewer_id=assignment.reporting_manager_id,
+            batch_status="draft",
+            created_by=user.id,
+            updated_by=user.id,
+        )
+        db.add(batch)
+        await db.flush()
+    return batch
+
+
+@router.get("/teacher/marks-entry-options")
+async def teacher_marks_entry_options(
+    db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user)
+):
+    employee_id = await _linked_employee_id(db, user)
+    today = date.today()
+    assignments = (await db.execute(select(TeacherAssignment).where(
+        TeacherAssignment.tenant_id == user.tenant_id,
+        TeacherAssignment.employee_id == employee_id,
+        TeacherAssignment.assignment_status == "active",
+        TeacherAssignment.is_deleted.is_(False),
+    ))).scalars().all()
+    assignments = [
+        a for a in assignments
+        if (not a.effective_from or a.effective_from <= today)
+        and (not a.effective_to or a.effective_to >= today)
+        and a.grade_id and a.section_id and a.subject_id
+    ]
+    maps = await _name_maps(db, user.tenant_id)
+    exams = (await db.execute(select(Exam).where(
+        Exam.tenant_id == user.tenant_id,
+        Exam.is_deleted.is_(False),
+    ).order_by(Exam.start_date.desc(), Exam.name))).scalars().all()
+    employees = {
+        e.id: f"{e.first_name} {e.last_name or ''}".strip()
+        for e in (await db.execute(select(Employee).where(
+            Employee.tenant_id == user.tenant_id,
+            Employee.is_deleted.is_(False),
+        ))).scalars().all()
+    }
+    return {
+        "assignments": [
+            {
+                "id": str(a.id),
+                "grade_id": str(a.grade_id),
+                "section_id": str(a.section_id),
+                "subject_id": str(a.subject_id),
+                "grade": maps["grades"].get(a.grade_id, "Class"),
+                "section": maps["sections"].get(a.section_id, "Section"),
+                "subject": maps["subjects"].get(a.subject_id, "Subject"),
+                "reviewer": employees.get(a.reporting_manager_id),
+                "exams": [
+                    {"id": str(e.id), "name": e.name, "code": e.code}
+                    for e in exams if not e.grade_id or e.grade_id == a.grade_id
+                ],
+            }
+            for a in assignments
+        ]
+    }
+
+
+@router.get("/teacher/marks-sheet")
+async def teacher_marks_sheet(
+    assignment_id: uuid.UUID,
+    exam_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    employee_id, assignment = await _teacher_assignment(db, user, assignment_id)
+    exam, maximum = await _assignment_exam(db, user, assignment, exam_id)
+    students = await _assignment_roster(db, user, assignment)
+    marks = (await db.execute(select(Marks).where(
+        Marks.tenant_id == user.tenant_id,
+        Marks.exam_id == exam_id,
+        Marks.subject_id == assignment.subject_id,
+        Marks.student_id.in_([s.id for s in students]) if students else Marks.student_id.is_(None),
+        Marks.is_deleted.is_(False),
+    ))).scalars().all()
+    by_student = {m.student_id: m for m in marks}
+    batch = await _marks_batch(db, user, employee_id, assignment, exam_id)
+    return {
+        "exam": {"id": str(exam.id), "name": exam.name, "code": exam.code},
+        "assignment": {
+            "id": str(assignment.id),
+            "grade_id": str(assignment.grade_id),
+            "section_id": str(assignment.section_id),
+            "subject_id": str(assignment.subject_id),
+        },
+        "max_marks": str(maximum),
+        "batch": None if not batch else {
+            "id": str(batch.id),
+            "status": batch.batch_status,
+            "review_note": batch.review_note,
+        },
+        "rows": [
+            {
+                "student_id": str(s.id),
+                "admission_no": s.admission_no,
+                "roll_no": s.roll_no,
+                "student_name": f"{s.first_name} {s.last_name or ''}".strip(),
+                "marks_obtained": (
+                    str(by_student[s.id].marks_obtained) if s.id in by_student and not by_student[s.id].is_absent else ""
+                ),
+                "is_absent": by_student[s.id].is_absent if s.id in by_student else False,
+                "remarks": by_student[s.id].remarks if s.id in by_student else "",
+                "grade": by_student[s.id].grade_letter if s.id in by_student else None,
+            }
+            for s in students
+        ],
+    }
+
+
+async def _save_teacher_marks(
+    db: AsyncSession, user: CurrentUser, payload: TeacherMarkSheetIn, submit: bool
+) -> tuple[MarksBatch, int]:
+    employee_id, assignment = await _teacher_assignment(db, user, payload.assignment_id)
+    _, maximum = await _assignment_exam(db, user, assignment, payload.exam_id)
+    students = await _assignment_roster(db, user, assignment)
+    roster_ids = {s.id for s in students}
+    entries = {e.student_id: e for e in payload.entries}
+    if set(entries) - roster_ids:
+        raise HTTPException(422, "Marks contain a student outside the assigned class")
+    if submit and set(entries) != roster_ids:
+        raise HTTPException(422, "Every student must have marks or be marked absent before submission")
+    batch = await _marks_batch(db, user, employee_id, assignment, payload.exam_id, create=True)
+    assert batch is not None
+    if batch.batch_status in ("approved", "published"):
+        raise HTTPException(409, "Approved marks are locked and cannot be changed")
+    if submit and not assignment.reporting_manager_id:
+        raise HTTPException(409, "Map an HOD/marks approver on the teacher assignment before submission")
+
+    written = 0
+    for student in students:
+        entry = entries.get(student.id)
+        existing = (await db.execute(select(Marks).where(
+            Marks.tenant_id == user.tenant_id,
+            Marks.exam_id == payload.exam_id,
+            Marks.student_id == student.id,
+            Marks.subject_id == assignment.subject_id,
+        ))).scalars().first()
+        if not entry or (entry.marks_obtained is None and not entry.is_absent):
+            if submit:
+                raise HTTPException(422, f"Enter marks or mark absent for {student.first_name}")
+            if existing:
+                existing.is_deleted = True
+                existing.updated_by = user.id
+            continue
+        awarded = Decimal(0) if entry.is_absent else entry.marks_obtained
+        if awarded is None or awarded < 0 or awarded > maximum:
+            raise HTTPException(422, f"Marks for {student.first_name} must be between 0 and {maximum}")
+        values = {
+            "marks_obtained": awarded,
+            "max_marks": maximum,
+            "grade_letter": _mark_grade(awarded, maximum, entry.is_absent),
+            "is_absent": entry.is_absent,
+            "remarks": entry.remarks,
+            "updated_by": user.id,
+            "is_deleted": False,
+        }
+        if existing:
+            for key, value in values.items():
+                setattr(existing, key, value)
+        else:
+            db.add(Marks(
+                tenant_id=user.tenant_id,
+                exam_id=payload.exam_id,
+                student_id=student.id,
+                subject_id=assignment.subject_id,
+                created_by=user.id,
+                **values,
+            ))
+        written += 1
+
+    batch.teacher_id = employee_id
+    batch.reviewer_id = assignment.reporting_manager_id
+    batch.batch_status = "submitted" if submit else "draft"
+    batch.review_note = None if submit else batch.review_note
+    batch.submitted_at = datetime.now(timezone.utc) if submit else None
+    batch.updated_by = user.id
+    await db.flush()
+    await record_audit(
+        db,
+        action="submit_marks_sheet" if submit else "save_marks_sheet",
+        entity="MarksBatch",
+        entity_id=batch.id,
+        actor=user,
+        changes={"count": written, "assignment_id": str(assignment.id)},
+    )
+    return batch, written
+
+
+@router.post("/teacher/marks-sheet")
+async def teacher_save_marks_sheet(
+    payload: TeacherMarkSheetIn,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    batch, written = await _save_teacher_marks(db, user, payload, submit=False)
+    return {"id": str(batch.id), "status": batch.batch_status, "count": written}
+
+
+@router.post("/teacher/marks-sheet/submit")
+async def teacher_submit_marks_sheet(
+    payload: TeacherMarkSheetIn,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    batch, written = await _save_teacher_marks(db, user, payload, submit=True)
+    return {"id": str(batch.id), "status": batch.batch_status, "count": written}
+
+
+@router.get("/teacher/marks-review/{batch_id}")
+async def teacher_marks_review_sheet(
+    batch_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    employee_id = await _linked_employee_id(db, user)
+    batch = await db.get(MarksBatch, batch_id)
+    if (
+        not batch
+        or batch.tenant_id != user.tenant_id
+        or batch.reviewer_id != employee_id
+        or batch.is_deleted
+    ):
+        raise HTTPException(404, "Marks batch not found in your review queue")
+    students = await _assignment_roster(
+        db,
+        user,
+        type("ReviewScope", (), {"grade_id": batch.grade_id, "section_id": batch.section_id})(),
+    )
+    marks = (await db.execute(select(Marks).where(
+        Marks.tenant_id == user.tenant_id,
+        Marks.exam_id == batch.exam_id,
+        Marks.subject_id == batch.subject_id,
+        Marks.is_deleted.is_(False),
+    ))).scalars().all()
+    by_student = {m.student_id: m for m in marks}
+    return {
+        "id": str(batch.id),
+        "status": batch.batch_status,
+        "review_note": batch.review_note,
+        "rows": [
+            {
+                "student_id": str(s.id),
+                "roll_no": s.roll_no,
+                "admission_no": s.admission_no,
+                "student_name": f"{s.first_name} {s.last_name or ''}".strip(),
+                "marks_obtained": str(by_student[s.id].marks_obtained) if s.id in by_student else "",
+                "max_marks": str(by_student[s.id].max_marks) if s.id in by_student else "",
+                "is_absent": by_student[s.id].is_absent if s.id in by_student else False,
+                "grade": by_student[s.id].grade_letter if s.id in by_student else None,
+            }
+            for s in students
+        ],
+    }
+
+
+@router.post("/teacher/marks-review/{batch_id}")
+async def teacher_review_marks(
+    batch_id: uuid.UUID,
+    payload: MarksReviewIn,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    if payload.decision not in ("approved", "rejected"):
+        raise HTTPException(422, "decision must be approved or rejected")
+    employee_id = await _linked_employee_id(db, user)
+    batch = await db.get(MarksBatch, batch_id)
+    if (
+        not batch
+        or batch.tenant_id != user.tenant_id
+        or batch.reviewer_id != employee_id
+        or batch.is_deleted
+    ):
+        raise HTTPException(404, "Marks batch not found in your review queue")
+    if batch.batch_status != "submitted":
+        raise HTTPException(409, "Only submitted marks can be reviewed")
+    batch.batch_status = payload.decision
+    batch.review_note = payload.review_note
+    batch.reviewed_at = datetime.now(timezone.utc)
+    batch.updated_by = user.id
+    await db.flush()
+    await record_audit(db, action=payload.decision, entity="MarksBatch", entity_id=batch.id, actor=user)
+    return {"id": str(batch.id), "status": batch.batch_status}
 
 
 @router.post("/teacher/submissions/{submission_id}/grade")

@@ -1207,6 +1207,10 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
         await _portal_user("teacher@sumaya.edu",
                            f"{teacher_emp.first_name} {teacher_emp.last_name or ''}".strip(), "Teacher@123",
                            roles["teacher"], "employee", teacher_emp.id)
+    if principal_emp and roles["teacher"]:
+        await _portal_user("hod@sumaya.edu",
+                           f"{principal_emp.first_name} {principal_emp.last_name or ''}".strip(), "Hod@123",
+                           roles["teacher"], "employee", principal_emp.id)
 
 
 if __name__ == "__main__":

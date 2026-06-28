@@ -1,8 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { Icon } from "../components/Icon";
 import { PortalShell } from "../components/PortalShell";
-import { api } from "../lib/api";
+import { api, apiError } from "../lib/api";
 import { useBranding } from "../lib/branding";
 import { printMarksheet } from "../lib/print";
 import { ContinuingAdmission } from "./ContinuingAdmission";
@@ -21,6 +22,10 @@ interface Dash {
   assets?: { type: string; name: string; quantity: number; status: string; issue_date?: string; due_date?: string }[];
   achievements?: { title: string; category?: string; level?: string; date?: string }[];
   activities?: { name: string; status: string; date?: string }[];
+  hostel?: {
+    block: string; room: string; bed: string; warden?: string; allocated_since?: string;
+    recent_attendance: { date: string; status: string; remarks?: string }[];
+  } | null;
   remarks?: { type: string; remark: string; by?: string; date?: string }[];
   announcements: { title: string; body?: string; date?: string }[];
 }
@@ -171,6 +176,30 @@ function Student360View({ childView }: { childView?: boolean }) {
           </div>
         </div>
         <AnnouncementsCard items={data.announcements} />
+      </div>
+
+      <div className="card p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-600">Hostel & Residence</h3>
+            {data.hostel ? (
+              <p className="mt-1 text-lg font-semibold">{data.hostel.block} · Room {data.hostel.room} · Bed {data.hostel.bed}</p>
+            ) : <p className="mt-1 text-sm text-slate-400">No active hostel allocation.</p>}
+          </div>
+          {data.hostel && <div className="text-right text-xs text-slate-500">
+            <div>Warden: {data.hostel.warden || "—"}</div>
+            <div>Allocated since: {data.hostel.allocated_since || "—"}</div>
+          </div>}
+        </div>
+        {data.hostel && data.hostel.recent_attendance.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {data.hostel.recent_attendance.map((item) => (
+              <span key={item.date} className={`badge ${item.status === "present" ? "bg-emerald-50 text-emerald-700" : item.status === "leave" ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"}`}>
+                {item.date}: {item.status}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="card overflow-hidden">
@@ -757,6 +786,318 @@ function TeacherMarksReview() {
   );
 }
 
+// ---------------------------------------------------------------- Teacher: quarterly planning
+interface TopicRow { name: string; weeks?: string; hours?: number; status: string }
+interface Plan {
+  id: string; title: string; term: string; academic_year_id?: string | null;
+  grade_id?: string | null; section_id?: string | null; subject_id?: string | null;
+  grade: string; section: string; subject: string;
+  objectives?: string; resources?: string; topics: TopicRow[];
+  completion_percent: number; status: string; teacher: string;
+  reviewer?: string | null; reviewer_id?: string | null; review_note?: string | null;
+}
+interface PlanOptions {
+  terms: string[];
+  academic_years: { id: string; name: string; is_current: boolean }[];
+  classes: { grade_id?: string | null; section_id?: string | null; subject_id?: string | null; grade: string; section: string; subject: string }[];
+  reviewers: { id: string; name: string; designation?: string }[];
+}
+
+const TOPIC_STATUS = ["pending", "in_progress", "done"];
+const STATUS_BADGE: Record<string, string> = {
+  draft: "bg-slate-100 text-slate-600", submitted: "bg-amber-50 text-amber-700",
+  approved: "bg-emerald-50 text-emerald-700", rejected: "bg-rose-50 text-rose-700",
+  in_progress: "bg-indigo-50 text-indigo-700", completed: "bg-emerald-50 text-emerald-700",
+};
+
+const emptyForm = () => ({
+  title: "", term: "Quarter 1", academic_year_id: "", classKey: "",
+  objectives: "", resources: "",
+  topics: [{ name: "", weeks: "", hours: undefined as number | undefined, status: "pending" }] as TopicRow[],
+});
+
+function TeacherPlans() {
+  const qc = useQueryClient();
+  const { data: options } = useQuery({
+    queryKey: ["teacher-plan-options"],
+    queryFn: async () => (await api.get<PlanOptions>("/portal/teacher/plan-options")).data,
+  });
+  const { data: plans } = useQuery({
+    queryKey: ["teacher-plans"],
+    queryFn: async () => (await api.get<Plan[]>("/portal/teacher/plans")).data,
+  });
+  const [form, setForm] = useState(emptyForm());
+  const [editing, setEditing] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const refresh = () => qc.invalidateQueries({ queryKey: ["teacher-plans"] });
+
+  function classKeyFor(p: Plan) {
+    return [p.grade_id ?? "", p.section_id ?? "", p.subject_id ?? ""].join("|");
+  }
+  function loadIntoForm(p: Plan) {
+    setEditing(p.id);
+    setForm({
+      title: p.title, term: p.term, academic_year_id: p.academic_year_id ?? "",
+      classKey: classKeyFor(p), objectives: p.objectives ?? "", resources: p.resources ?? "",
+      topics: p.topics.length ? p.topics : emptyForm().topics,
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  function reset() { setEditing(null); setForm(emptyForm()); setError(""); }
+
+  async function save() {
+    setError("");
+    const [grade_id, section_id, subject_id] = form.classKey.split("|");
+    const body = {
+      title: form.title, term: form.term,
+      academic_year_id: form.academic_year_id || null,
+      grade_id: grade_id || null, section_id: section_id || null, subject_id: subject_id || null,
+      objectives: form.objectives || null, resources: form.resources || null,
+      topics: form.topics.filter((t) => t.name.trim()),
+    };
+    try {
+      if (editing) await api.put(`/portal/teacher/plans/${editing}`, body);
+      else await api.post("/portal/teacher/plans", body);
+      reset();
+      refresh();
+    } catch (e) { setError(apiError(e)); }
+  }
+  async function submitPlan(p: Plan) {
+    const reviewers = options?.reviewers ?? [];
+    let reviewer_id = p.reviewer_id ?? "";
+    if (!reviewer_id) {
+      const choices = reviewers.map((r, i) => `${i + 1}. ${r.name}${r.designation ? ` (${r.designation})` : ""}`).join("\n");
+      const pick = prompt(`Submit "${p.title}" for approval.\nChoose a reviewer:\n${choices}`);
+      if (pick === null) return;
+      const idx = Number(pick) - 1;
+      if (!reviewers[idx]) { alert("Invalid reviewer."); return; }
+      reviewer_id = reviewers[idx].id;
+    }
+    try {
+      await api.post(`/portal/teacher/plans/${p.id}/submit`, { reviewer_id });
+      refresh();
+    } catch (e) { alert(apiError(e)); }
+  }
+  async function del(p: Plan) {
+    if (!confirm(`Delete "${p.title}"?`)) return;
+    try { await api.delete(`/portal/teacher/plans/${p.id}`); refresh(); } catch (e) { alert(apiError(e)); }
+  }
+
+  const setTopic = (i: number, patch: Partial<TopicRow>) =>
+    setForm((f) => ({ ...f, topics: f.topics.map((t, j) => (j === i ? { ...t, ...patch } : t)) }));
+
+  return (
+    <div className="space-y-5">
+      <div className="card p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-slate-600">{editing ? "Edit Plan" : "New Quarterly Plan"}</h3>
+          {editing && <button className="btn-ghost text-xs" onClick={reset}>Cancel edit</button>}
+        </div>
+        {error && <div className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>}
+        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+          <label className="lg:col-span-2"><span className="label">Plan Title</span>
+            <input className="input" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="e.g. Mathematics — Quarter 1 Plan" /></label>
+          <label><span className="label">Term</span>
+            <select className="input" value={form.term} onChange={(e) => setForm({ ...form, term: e.target.value })}>
+              {(options?.terms ?? ["Quarter 1"]).map((t) => <option key={t} value={t}>{t}</option>)}
+            </select></label>
+          <label><span className="label">Academic Year</span>
+            <select className="input" value={form.academic_year_id} onChange={(e) => setForm({ ...form, academic_year_id: e.target.value })}>
+              <option value="">—</option>
+              {options?.academic_years.map((y) => <option key={y.id} value={y.id}>{y.name}{y.is_current ? " (current)" : ""}</option>)}
+            </select></label>
+          <label className="lg:col-span-2"><span className="label">Class & Subject</span>
+            <select className="input" value={form.classKey} onChange={(e) => setForm({ ...form, classKey: e.target.value })}>
+              <option value="">— select from your allocations —</option>
+              {options?.classes.map((c) => {
+                const key = [c.grade_id ?? "", c.section_id ?? "", c.subject_id ?? ""].join("|");
+                return <option key={key} value={key}>{c.grade} / {c.section} · {c.subject}</option>;
+              })}
+            </select></label>
+          <label className="lg:col-span-2"><span className="label">Objectives</span>
+            <input className="input" value={form.objectives} onChange={(e) => setForm({ ...form, objectives: e.target.value })} /></label>
+          <label className="lg:col-span-2"><span className="label">Resources</span>
+            <input className="input" value={form.resources} onChange={(e) => setForm({ ...form, resources: e.target.value })} /></label>
+        </div>
+
+        <div className="mt-4">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="label">Topics for the quarter</span>
+            <button className="btn-ghost text-xs text-brand-600" onClick={() => setForm((f) => ({ ...f, topics: [...f.topics, { name: "", weeks: "", hours: undefined, status: "pending" }] }))}>+ Add topic</button>
+          </div>
+          <div className="space-y-2">
+            {form.topics.map((t, i) => (
+              <div key={i} className="grid grid-cols-12 gap-2">
+                <input className="input col-span-5" placeholder="Topic name" value={t.name} onChange={(e) => setTopic(i, { name: e.target.value })} />
+                <input className="input col-span-3" placeholder="Weeks (e.g. 1-2)" value={t.weeks ?? ""} onChange={(e) => setTopic(i, { weeks: e.target.value })} />
+                <input className="input col-span-1" type="number" placeholder="Hrs" value={t.hours ?? ""} onChange={(e) => setTopic(i, { hours: e.target.value ? Number(e.target.value) : undefined })} />
+                <select className="input col-span-2" value={t.status} onChange={(e) => setTopic(i, { status: e.target.value })}>
+                  {TOPIC_STATUS.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
+                </select>
+                <button className="col-span-1 text-slate-300 hover:text-rose-500" onClick={() => setForm((f) => ({ ...f, topics: f.topics.filter((_, j) => j !== i) }))} title="Remove">✕</button>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="mt-4">
+          <button className="btn-primary" onClick={() => void save()}>{editing ? "Save changes" : "Create draft"}</button>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {plans?.map((p) => (
+          <div key={p.id} className="card p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold">{p.title}</div>
+                <div className="text-xs text-slate-400">{p.term} · {p.grade}/{p.section} · {p.subject}</div>
+              </div>
+              <span className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${STATUS_BADGE[p.status] ?? "bg-slate-100 text-slate-600"}`}>
+                {p.status.replace("_", " ")}
+              </span>
+            </div>
+            {p.topics.length > 0 && (
+              <div className="mt-3 overflow-hidden rounded-lg border border-slate-100">
+                <table className="w-full text-xs">
+                  <tbody className="divide-y divide-slate-100">
+                    {p.topics.map((t, i) => (
+                      <tr key={i}>
+                        <td className="px-3 py-1.5">{t.name}</td>
+                        <td className="px-3 py-1.5 text-slate-400">{t.weeks || "—"}</td>
+                        <td className="px-3 py-1.5 text-slate-400">{t.hours ? `${t.hours}h` : "—"}</td>
+                        <td className="px-3 py-1.5 capitalize text-slate-500">{(t.status || "pending").replace("_", " ")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <div className="mt-2 text-xs text-slate-400">
+              {p.completion_percent}% complete
+              {p.reviewer ? ` · reviewer: ${p.reviewer}` : ""}
+            </div>
+            {p.review_note && p.status === "rejected" && (
+              <div className="mt-2 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">Returned: {p.review_note}</div>
+            )}
+            {(p.status === "draft" || p.status === "rejected") && (
+              <div className="mt-3 flex gap-2">
+                <button className="btn-primary px-2.5 py-1 text-xs" onClick={() => void submitPlan(p)}>Submit for approval</button>
+                <button className="btn-ghost border border-slate-200 px-2.5 py-1 text-xs" onClick={() => loadIntoForm(p)}>Edit</button>
+                <button className="btn-ghost px-2.5 py-1 text-xs text-rose-500" onClick={() => void del(p)}>Delete</button>
+              </div>
+            )}
+          </div>
+        ))}
+        {(!plans || plans.length === 0) && <div className="card p-5 text-sm text-slate-400">No plans yet. Create one above.</div>}
+      </div>
+    </div>
+  );
+}
+
+function TeacherPlanReviews() {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["teacher-plan-reviews"],
+    queryFn: async () => (await api.get<Plan[]>("/portal/teacher/plan-reviews")).data,
+  });
+  async function review(p: Plan, decision: "approved" | "rejected") {
+    const review_note = decision === "rejected" ? prompt("Reason for returning the plan:") ?? "" : prompt("Approval note (optional):") ?? "";
+    try {
+      await api.post(`/portal/teacher/plans/${p.id}/review`, { decision, review_note });
+      qc.invalidateQueries({ queryKey: ["teacher-plan-reviews"] });
+    } catch (e) { alert(apiError(e)); }
+  }
+  return (
+    <div className="space-y-3">
+      {data?.map((p) => (
+        <div key={p.id} className="card p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold">{p.title}</div>
+              <div className="text-xs text-slate-400">{p.term} · {p.grade}/{p.section} · {p.subject} · by {p.teacher}</div>
+            </div>
+            <span className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${STATUS_BADGE[p.status] ?? "bg-slate-100 text-slate-600"}`}>
+              {p.status.replace("_", " ")}
+            </span>
+          </div>
+          {p.objectives && <p className="mt-2 text-sm text-slate-500">{p.objectives}</p>}
+          {p.topics.length > 0 && (
+            <ul className="mt-2 list-disc pl-5 text-xs text-slate-500">
+              {p.topics.map((t, i) => <li key={i}>{t.name}{t.weeks ? ` (${t.weeks})` : ""}</li>)}
+            </ul>
+          )}
+          {p.status === "submitted" && (
+            <div className="mt-3 flex gap-2">
+              <button className="btn-primary px-2.5 py-1 text-xs" onClick={() => void review(p, "approved")}>Approve</button>
+              <button className="btn-ghost border border-slate-200 px-2.5 py-1 text-xs text-rose-600" onClick={() => void review(p, "rejected")}>Return</button>
+            </div>
+          )}
+          {p.review_note && p.status !== "submitted" && <div className="mt-2 text-xs text-slate-400">Note: {p.review_note}</div>}
+        </div>
+      ))}
+      {(!data || data.length === 0) && <div className="card p-5 text-sm text-slate-400">No plans awaiting your review.</div>}
+    </div>
+  );
+}
+
+function TeacherMarks() {
+  const [exam, setExam] = useState("");
+  const [subject, setSubject] = useState("");
+  const { data } = useQuery({
+    queryKey: ["teacher-marks", exam, subject],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (exam) params.set("exam_id", exam);
+      if (subject) params.set("subject_id", subject);
+      const qs = params.toString();
+      return (await api.get<{ filters: { subjects: { id: string; name: string }[]; exams: { id: string; name: string }[] }; rows: any[] }>(
+        `/portal/teacher/marks${qs ? `?${qs}` : ""}`)).data;
+    },
+  });
+  return (
+    <div className="space-y-4">
+      <div className="card flex flex-wrap items-end gap-3 p-4">
+        <label><span className="label">Exam</span>
+          <select className="input" value={exam} onChange={(e) => setExam(e.target.value)}>
+            <option value="">All exams</option>
+            {data?.filters.exams.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+          </select></label>
+        <label><span className="label">Subject</span>
+          <select className="input" value={subject} onChange={(e) => setSubject(e.target.value)}>
+            <option value="">All my subjects</option>
+            {data?.filters.subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select></label>
+      </div>
+      <div className="card overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+            <tr>
+              <th className="px-4 py-3">Student</th><th className="px-4 py-3">Class</th>
+              <th className="px-4 py-3">Subject</th><th className="px-4 py-3">Exam</th>
+              <th className="px-4 py-3">Marks</th><th className="px-4 py-3">Grade</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {data?.rows.map((r) => (
+              <tr key={r.id} className="hover:bg-slate-50">
+                <td className="px-4 py-2.5 font-medium">{r.student}<span className="ml-1 text-xs text-slate-400">{r.admission_no}</span></td>
+                <td className="px-4 py-2.5">{r.grade}/{r.section}</td>
+                <td className="px-4 py-2.5">{r.subject}</td>
+                <td className="px-4 py-2.5">{r.exam}</td>
+                <td className="px-4 py-2.5">{r.is_absent ? "Absent" : `${r.marks_obtained} / ${r.max_marks}`}</td>
+                <td className="px-4 py-2.5">{r.grade_letter || "—"}</td>
+              </tr>
+            ))}
+            {(!data || data.rows.length === 0) && (
+              <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-400">No marks recorded for your students yet.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export function TeacherPortal() {
   return (
     <PortalShell
@@ -765,14 +1106,20 @@ export function TeacherPortal() {
         { label: "Dashboard", icon: "grid", to: "" },
         { label: "Schedule", icon: "table", to: "schedule" },
         { label: "My Students", icon: "users", to: "students" },
-        { label: "Grade Homework", icon: "book", to: "submissions" },
-        { label: "Marks Review", icon: "check-square", to: "marks-review" },
+        { label: "Lesson Planning", icon: "book", to: "plans" },
+        { label: "Plan Approvals", icon: "check-square", to: "plan-reviews" },
+        { label: "Student Marks", icon: "trending-up", to: "marks" },
+        { label: "Grade Homework", icon: "edit", to: "submissions" },
+        { label: "Marks Review", icon: "shield", to: "marks-review" },
       ]}
     >
       <Routes>
         <Route index element={<TeacherHome />} />
         <Route path="schedule" element={<TeacherSchedule />} />
         <Route path="students" element={<TeacherStudents />} />
+        <Route path="plans" element={<TeacherPlans />} />
+        <Route path="plan-reviews" element={<TeacherPlanReviews />} />
+        <Route path="marks" element={<TeacherMarks />} />
         <Route path="submissions" element={<TeacherSubmissions />} />
         <Route path="marks-review" element={<TeacherMarksReview />} />
         <Route path="*" element={<Navigate to="" replace />} />

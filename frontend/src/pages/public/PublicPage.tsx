@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { publicApi } from "../../lib/api";
-
-const SITE_CODE = "SUMAYA";
+import { PublicFooter, PublicHeader, SITE_CODE, usePublicSite } from "./PublicSite";
 
 export function PublicPage() {
   const { slug = "" } = useParams();
+  const { data: siteData } = usePublicSite();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["public-page", slug],
     queryFn: async () => (await publicApi.get<any>(`/public/site/${SITE_CODE}/page/${slug}`)).data,
@@ -13,17 +13,7 @@ export function PublicPage() {
 
   return (
     <div className="min-h-full bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-3xl items-center justify-between px-6 py-3">
-          <Link to="/" className="flex items-center gap-2.5">
-            {data?.branding?.logo_url && (
-              <img src={data.branding.logo_url} alt="" className="h-8 w-8 rounded-lg object-contain" />
-            )}
-            <span className="text-sm font-bold">{data?.branding?.institution_name ?? "Home"}</span>
-          </Link>
-          <Link to="/" className="btn-ghost text-sm">← Home</Link>
-        </div>
-      </header>
+      <PublicHeader data={siteData} />
 
       <div className="mx-auto max-w-3xl px-6 py-10">
         {isLoading && <p className="text-slate-400">Loading…</p>}
@@ -37,6 +27,7 @@ export function PublicPage() {
           </article>
         )}
       </div>
+      <PublicFooter data={siteData} />
     </div>
   );
 }

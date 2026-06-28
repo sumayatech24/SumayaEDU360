@@ -25,7 +25,7 @@ from app.models.content import PtmMeeting
 from app.models.exams import Exam, Marks, MarksBatch
 from app.models.fees import Invoice, Payment
 from app.models.finance import Expense, Vendor
-from app.models.hostel import HostelBlock, HostelRoom
+from app.models.hostel import HostelAllocation, HostelAttendance, HostelBed, HostelBlock, HostelRoom
 from app.models.hr import LeaveRequest, Payroll
 from app.models.library import BookIssue, LibraryBook
 from app.models.operations import Activity, ActivityRegistration, Announcement, AssetAssignment, InventoryItem
@@ -456,6 +456,37 @@ async def student_360(
             "subject": subjects.get(a.subject_id, "Class Teacher" if not a.subject_id else "—"),
         })
 
+    hostel_allocation = (await db.execute(select(HostelAllocation).where(
+        HostelAllocation.tenant_id == tid,
+        HostelAllocation.student_id == student.id,
+        HostelAllocation.allocation_status == "allocated",
+        HostelAllocation.is_deleted.is_(False),
+    ))).scalars().first()
+    hostel = None
+    if hostel_allocation:
+        hostel_room = await db.get(HostelRoom, hostel_allocation.room_id)
+        hostel_block = await db.get(HostelBlock, hostel_room.block_id) if hostel_room else None
+        hostel_bed = (await db.execute(select(HostelBed).where(
+            HostelBed.current_allocation_id == hostel_allocation.id,
+            HostelBed.is_deleted.is_(False),
+        ))).scalars().first()
+        hostel_attendance = (await db.execute(select(HostelAttendance).where(
+            HostelAttendance.tenant_id == tid,
+            HostelAttendance.student_id == student.id,
+            HostelAttendance.is_deleted.is_(False),
+        ).order_by(HostelAttendance.attendance_date.desc()).limit(7))).scalars().all()
+        hostel = {
+            "block": hostel_block.name if hostel_block else "—",
+            "room": hostel_room.room_no if hostel_room else "—",
+            "bed": hostel_bed.bed_no if hostel_bed else "—",
+            "warden": hostel_block.warden_name if hostel_block else None,
+            "allocated_since": _s(hostel_allocation.allocation_date),
+            "recent_attendance": [
+                {"date": _s(a.attendance_date), "status": a.attendance_status, "remarks": a.remarks}
+                for a in hostel_attendance
+            ],
+        }
+
     return {
         "student": {
             "id": str(student.id), "admission_no": student.admission_no, "roll_no": student.roll_no,
@@ -535,6 +566,7 @@ async def student_360(
              "status": b.issue_status, "issue_date": _s(b.issue_date), "due_date": _s(b.due_date)}
             for b in book_issues
         ],
+        "hostel": hostel,
         "teachers": teacher_rows,
     }
 

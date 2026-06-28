@@ -36,9 +36,9 @@ four delivery states:
 | P2 | Employee HRMS | Functional partial | Attendance/shift linkage, leave balances/policies, payroll components/statutory deductions, approval and payslip cycle. |
 | P2 | Timetable & Scheduling | CRUD / thin screen | Conflict detection, room/resource constraints, substitution, publish/version workflow. |
 | P2 | Homework & Assignments | Functional partial | Rubrics, attachments, late/resubmission rules, class-wide grading workbench, notifications. |
-| P2 | Library Management | Functional partial | Reservation/renewal, member limits, fine collection/waiver, acquisition, stock verification, lost/damaged flow. |
+| Done | Library Management | **End-to-end core** | Catalog and copy inventory, issue/renew/return/lost handling, circulation and category performance, acquisition requests, vendor purchase orders, approval/order lifecycle, goods receipt and automatic stock/accession creation. Future extension: reservations and configurable member/fine policies. |
 | P2 | Transport | CRUD / thin screen | Route planning, stop allocation, capacity, driver trips, attendance, GPS/events, transport billing. |
-| P2 | Hostel | Functional partial | Bed-level allocation, visitor/gate pass, hostel attendance, mess/fee linkage, incidents. |
+| Done | Hostel | **End-to-end core** | Class-first student allocation, gender/capacity safeguards, automatic bed inventory, transfer/vacate lifecycle, daily attendance, visitor check-in/out, incidents, occupancy dashboard, and student/parent portal visibility. Future extension: mess and hostel fee linkage. |
 | P2 | Finance / Store / Assets | Functional partial | Double-entry posting, budgets, approvals, GRN/vendor bills; purchase-to-stock; asset maintenance/depreciation/disposal. |
 | P3 | Parent / Student / Teacher portals | Functional partial | Notifications/inbox, requests and approvals, consent, appointments, richer self-service and mobile-responsive workflow coverage. |
 | P3 | Curriculum, Question Bank, Learning Repository | CRUD / thin screen | Curriculum mapping, coverage monitoring, blueprint/paper assembly, review/publish/versioning. |
@@ -75,7 +75,7 @@ Admissions rather than expanding all modules horizontally.
 | M018 | Finance & Accounting | **Workflow** | Bespoke screen: ledger, vendors, expenses (Approve/Reject/Pay), PO; +Store/Inventory with Stock In/Out adjusting on-hand |
 | M019 | Meal & Cafeteria | **Typed CRUD** | Meal plans + weekly menus typed |
 | M020 | Transport | **Typed CRUD** | Routes, vehicles, stops, student assignments |
-| M021 | Hostel | **Workflow** | Blocks, rooms, allocate/vacate + occupancy |
+| M021 | Hostel | **End-to-end core** | Blocks/rooms/beds, class-linked allocate/transfer/vacate, attendance, visitors, incidents, occupancy and portal visibility |
 | M022 | Activities & Events | **Workflow** | Bespoke screen: activities + capacity-aware registration |
 | M023 | PTM & Communication | **Workflow** | Announcements (Publish) + PTM meeting slots/status |
 | M024 | Knowledge Base | **Workflow** | Bespoke screen: articles with Publish + digital library |

@@ -83,6 +83,7 @@ export function Admissions() {
           <p className="text-sm text-slate-400">Application → verification → approval → fee collection → class enrollment.</p>
         </div>
         <div className="flex gap-2">
+          <a className="btn-ghost border border-slate-200" href="/" target="_blank" rel="noreferrer">View public website</a>
           <button className="btn-ghost border border-slate-200" onClick={() => navigator.clipboard.writeText(publicUrl)}>Copy public application link</button>
           <a className="btn-primary" href={publicUrl} target="_blank" rel="noreferrer">Open public form</a>
         </div>

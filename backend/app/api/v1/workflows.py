@@ -18,8 +18,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.audit import record_audit
 from app.core.database import get_db
 from app.core.deps import CurrentUser, require_permission
+from app.models.academic import Grade, Section
 from app.models.admissions import AdmissionLead
-from app.models.hostel import HostelAllocation, HostelRoom
+from app.models.hostel import HostelAllocation, HostelBed, HostelBlock, HostelRoom
 from app.models.hr import LeaveRequest, Payroll
 from app.models.library import BookIssue, LibraryBook
 from app.models.people import Employee, Student
@@ -209,11 +210,16 @@ async def list_issues(
         book = await db.get(LibraryBook, i.book_id)
         student = await db.get(Student, i.student_id)
         out.append({
-            "id": str(i.id), "book": book.title if book else None,
+            "id": str(i.id), "book_id": str(i.book_id), "book": book.title if book else None,
+            "student_id": str(i.student_id),
             "student": f"{student.first_name} {student.last_name or ''}".strip() if student else None,
             "issue_date": i.issue_date.isoformat(), "due_date": i.due_date.isoformat(),
             "return_date": i.return_date.isoformat() if i.return_date else None,
-            "status": i.issue_status, "fine_amount": str(i.fine_amount),
+            "status": (
+                "overdue" if i.issue_status == "issued" and i.due_date < date.today()
+                else i.issue_status
+            ),
+            "fine_amount": str(i.fine_amount), "renew_count": i.renew_count,
         })
     return out
 
@@ -222,6 +228,7 @@ async def list_issues(
 class AllocateIn(BaseModel):
     student_id: uuid.UUID
     room_id: uuid.UUID
+    bed_id: uuid.UUID | None = None
 
 
 @router.post("/hostel/allocations")
@@ -233,8 +240,45 @@ async def allocate_room(
     room = await db.get(HostelRoom, payload.room_id)
     if not room or room.tenant_id != user.tenant_id or room.is_deleted:
         raise HTTPException(404, "Room not found")
+    student = await db.get(Student, payload.student_id)
+    if not student or student.tenant_id != user.tenant_id or student.is_deleted:
+        raise HTTPException(404, "Student not found")
+    if not student.grade_id or not student.section_id:
+        raise HTTPException(409, "Assign the student to a class and section before hostel allocation")
+    existing = (await db.execute(select(HostelAllocation).where(
+        HostelAllocation.tenant_id == user.tenant_id,
+        HostelAllocation.student_id == student.id,
+        HostelAllocation.allocation_status == "allocated",
+        HostelAllocation.is_deleted.is_(False),
+    ))).scalars().first()
+    if existing:
+        raise HTTPException(409, "Student already has an active hostel allocation")
     if room.occupied >= room.capacity:
         raise HTTPException(409, "Room is full")
+    block = await db.get(HostelBlock, room.block_id)
+    if block and student.gender:
+        gender = student.gender.lower()
+        if block.block_type == "boys" and gender not in ("male", "boy", "boys"):
+            raise HTTPException(409, "Student gender does not match the boys hostel block")
+        if block.block_type == "girls" and gender not in ("female", "girl", "girls"):
+            raise HTTPException(409, "Student gender does not match the girls hostel block")
+    beds = (await db.execute(select(HostelBed).where(
+        HostelBed.tenant_id == user.tenant_id, HostelBed.room_id == room.id,
+        HostelBed.is_deleted.is_(False),
+    ).order_by(HostelBed.bed_no))).scalars().all()
+    for number in range(len(beds) + 1, room.capacity + 1):
+        bed = HostelBed(
+            tenant_id=user.tenant_id, room_id=room.id, bed_no=str(number),
+            created_by=user.id, updated_by=user.id,
+        )
+        db.add(bed)
+        beds.append(bed)
+    await db.flush()
+    bed = await db.get(HostelBed, payload.bed_id) if payload.bed_id else next(
+        (b for b in beds if b.bed_status == "available"), None
+    )
+    if not bed or bed.room_id != room.id or bed.bed_status != "available":
+        raise HTTPException(409, "No available bed in this room")
     alloc = HostelAllocation(
         tenant_id=user.tenant_id, student_id=payload.student_id, room_id=room.id,
         allocation_date=date.today(), allocation_status="allocated",
@@ -243,8 +287,13 @@ async def allocate_room(
     room.occupied += 1
     db.add(alloc)
     await db.flush()
+    bed.bed_status = "occupied"
+    bed.current_allocation_id = alloc.id
     await record_audit(db, action="allocate", entity="HostelAllocation", entity_id=alloc.id, actor=user)
-    return {"id": str(alloc.id), "room_occupied": room.occupied, "room_capacity": room.capacity}
+    return {
+        "id": str(alloc.id), "bed_id": str(bed.id), "bed_no": bed.bed_no,
+        "room_occupied": room.occupied, "room_capacity": room.capacity,
+    }
 
 
 @router.get("/hostel/allocations")
@@ -252,8 +301,6 @@ async def list_allocations(
     db: AsyncSession = Depends(get_db),
     user: CurrentUser = Depends(require_permission("hostel:read")),
 ):
-    from app.models.hostel import HostelBlock
-
     rows = (
         await db.execute(select(HostelAllocation).where(
             HostelAllocation.tenant_id == user.tenant_id, HostelAllocation.is_deleted.is_(False))
@@ -264,11 +311,22 @@ async def list_allocations(
         room = await db.get(HostelRoom, a.room_id)
         block = await db.get(HostelBlock, room.block_id) if room else None
         student = await db.get(Student, a.student_id)
+        grade = await db.get(Grade, student.grade_id) if student and student.grade_id else None
+        section = await db.get(Section, student.section_id) if student and student.section_id else None
+        bed = (await db.execute(select(HostelBed).where(
+            HostelBed.current_allocation_id == a.id, HostelBed.is_deleted.is_(False)
+        ))).scalars().first()
         out.append({
             "id": str(a.id),
+            "student_id": str(a.student_id),
             "student": f"{student.first_name} {student.last_name or ''}".strip() if student else None,
+            "admission_no": student.admission_no if student else None,
+            "grade": grade.name if grade else None,
+            "section": section.name if section else None,
             "room": room.room_no if room else None,
+            "room_id": str(room.id) if room else None,
             "block": block.name if block else None,
+            "bed": bed.bed_no if bed else None,
             "allocation_date": a.allocation_date.isoformat() if a.allocation_date else None,
             "status": a.allocation_status,
         })
@@ -292,6 +350,12 @@ async def vacate_room(
     room = await db.get(HostelRoom, alloc.room_id)
     if room and room.occupied > 0:
         room.occupied -= 1
+    bed = (await db.execute(select(HostelBed).where(
+        HostelBed.current_allocation_id == alloc.id, HostelBed.is_deleted.is_(False)
+    ))).scalars().first()
+    if bed:
+        bed.bed_status = "available"
+        bed.current_allocation_id = None
     await db.flush()
     await record_audit(db, action="vacate", entity="HostelAllocation", entity_id=alloc.id, actor=user)
     return {"id": str(alloc.id), "status": "vacated"}

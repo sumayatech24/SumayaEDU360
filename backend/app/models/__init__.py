@@ -46,6 +46,7 @@ from app.models.meta import (  # noqa: F401
     Setting,
 )
 from app.models.academics_ops import (  # noqa: F401
+    CurriculumPlan,
     Homework,
     HomeworkSubmission,
     LessonPlan,
@@ -63,7 +64,15 @@ from app.models.content import (  # noqa: F401
     PtmMeeting,
     QuestionBankItem,
 )
-from app.models.hostel import HostelAllocation, HostelBlock, HostelRoom  # noqa: F401
+from app.models.hostel import (  # noqa: F401
+    HostelAllocation,
+    HostelAttendance,
+    HostelBed,
+    HostelBlock,
+    HostelIncident,
+    HostelRoom,
+    HostelVisitor,
+)
 from app.models.operations import (  # noqa: F401
     Activity,
     ActivityRegistration,
@@ -77,7 +86,16 @@ from app.models.operations import (  # noqa: F401
     StockMovement,
 )
 from app.models.hr import LeaveRequest, LeaveType, Payroll  # noqa: F401
-from app.models.library import BookIssue, LibraryBook  # noqa: F401
+from app.models.library import (  # noqa: F401
+    BookIssue,
+    LibraryAcquisitionRequest,
+    LibraryBook,
+    LibraryBookCopy,
+    LibraryGoodsReceipt,
+    LibraryGoodsReceiptLine,
+    LibraryPurchaseOrder,
+    LibraryPurchaseOrderLine,
+)
 from app.models.people import (  # noqa: F401
     Employee,
     Guardian,
@@ -111,11 +129,14 @@ __all__ = [
     "MasterValue", "MenuItem", "Module", "ModuleCapability", "Notification", "Setting",
     "Employee", "Guardian", "Student", "Teacher", "TeacherAssignment", "TeacherProfile",
     "Campus", "Institution", "Tenant",
-    "LibraryBook", "BookIssue",
+    "LibraryBook", "LibraryBookCopy", "BookIssue", "LibraryAcquisitionRequest",
+    "LibraryPurchaseOrder", "LibraryPurchaseOrderLine", "LibraryGoodsReceipt",
+    "LibraryGoodsReceiptLine",
     "TransportRoute", "Vehicle", "RouteStop", "StudentTransportAssignment",
-    "HostelBlock", "HostelRoom", "HostelAllocation",
+    "HostelBlock", "HostelRoom", "HostelAllocation", "HostelBed",
+    "HostelAttendance", "HostelVisitor", "HostelIncident",
     "LeaveType", "LeaveRequest", "Payroll",
-    "Homework", "HomeworkSubmission", "TimetablePeriod", "LessonPlan",
+    "Homework", "HomeworkSubmission", "TimetablePeriod", "LessonPlan", "CurriculumPlan",
     "LedgerAccount", "Vendor", "Expense", "PurchaseOrder",
     "InventoryItem", "StockMovement", "AssetAssignment", "Activity", "ActivityRegistration",
     "MealPlan", "MealMenu", "Announcement", "CmsPage", "Banner",

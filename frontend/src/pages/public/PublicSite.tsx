@@ -2,9 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { publicApi } from "../../lib/api";
 
-const SITE_CODE = "SUMAYA";
+export const SITE_CODE = "SUMAYA";
 
-interface SiteData {
+export interface SiteData {
   branding: { institution_name: string; logo_url: string; tagline: string; primary_color: string };
   institution?: { name: string; board?: string; address?: string } | null;
   banners: { title: string; image_url?: string; link_url?: string }[];
@@ -12,7 +12,14 @@ interface SiteData {
   news: { title: string; slug: string; type: string; date?: string; excerpt: string }[];
 }
 
-function Header({ data }: { data?: SiteData }) {
+export function usePublicSite(siteCode = SITE_CODE) {
+  return useQuery({
+    queryKey: ["public-site", siteCode],
+    queryFn: async () => (await publicApi.get<SiteData>(`/public/site/${siteCode}`)).data,
+  });
+}
+
+export function PublicHeader({ data, siteCode = SITE_CODE }: { data?: SiteData; siteCode?: string }) {
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
@@ -32,7 +39,7 @@ function Header({ data }: { data?: SiteData }) {
           ))}
         </nav>
         <div className="flex items-center gap-2">
-          <Link to={`/apply/${SITE_CODE}`} className="btn-primary text-sm">
+          <Link to={`/apply/${siteCode}`} className="btn-primary text-sm">
             Apply
           </Link>
           <Link to="/login" className="btn-ghost text-sm">
@@ -44,16 +51,25 @@ function Header({ data }: { data?: SiteData }) {
   );
 }
 
+export function PublicFooter({ data }: { data?: SiteData }) {
+  return (
+    <footer className="border-t border-slate-200 bg-white">
+      <div className="mx-auto max-w-6xl px-6 py-6 text-sm text-slate-500">
+        <div className="font-medium text-slate-700">{data?.branding.institution_name}</div>
+        <div className="mt-1">{data?.institution?.address}</div>
+        <div className="mt-2 text-xs text-slate-400">Powered by SumayaEDU360</div>
+      </div>
+    </footer>
+  );
+}
+
 export function PublicSite() {
-  const { data } = useQuery({
-    queryKey: ["public-site"],
-    queryFn: async () => (await publicApi.get<SiteData>(`/public/site/${SITE_CODE}`)).data,
-  });
+  const { data } = usePublicSite();
   const color = data?.branding.primary_color ?? "#2563eb";
 
   return (
     <div className="min-h-full bg-slate-50">
-      <Header data={data} />
+      <PublicHeader data={data} />
 
       {/* Hero */}
       <section className="text-white" style={{ background: `linear-gradient(135deg, ${color}, #0f172a)` }}>
@@ -128,13 +144,7 @@ export function PublicSite() {
         </div>
       </section>
 
-      <footer className="border-t border-slate-200 bg-white">
-        <div className="mx-auto max-w-6xl px-6 py-6 text-sm text-slate-500">
-          <div className="font-medium text-slate-700">{data?.branding.institution_name}</div>
-          <div className="mt-1">{data?.institution?.address}</div>
-          <div className="mt-2 text-xs text-slate-400">Powered by SumayaEDU360</div>
-        </div>
-      </footer>
+      <PublicFooter data={data} />
     </div>
   );
 }

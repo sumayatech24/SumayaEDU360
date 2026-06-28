@@ -105,6 +105,10 @@ class MarksReviewIn(BaseModel):
     review_note: str | None = None
 
 
+class ResultRuleIn(BaseModel):
+    pass_marks: Decimal
+
+
 def portal_for(roles: list[str], is_super: bool) -> str:
     if is_super:
         return "admin"
@@ -815,6 +819,97 @@ async def teacher_marks_entry_options(
     }
 
 
+@router.get("/teacher/result-rules")
+async def teacher_result_rules(
+    db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user)
+):
+    employee_id = await _linked_employee_id(db, user)
+    assignments = (await db.execute(select(TeacherAssignment).where(
+        TeacherAssignment.tenant_id == user.tenant_id,
+        TeacherAssignment.reporting_manager_id == employee_id,
+        TeacherAssignment.assignment_status == "active",
+        TeacherAssignment.is_deleted.is_(False),
+    ))).scalars().all()
+    scopes = {(a.grade_id, a.section_id, a.subject_id) for a in assignments}
+    maps = await _name_maps(db, user.tenant_id)
+    exams = {
+        exam.id: exam
+        for exam in (await db.execute(select(Exam).where(
+            Exam.tenant_id == user.tenant_id,
+            Exam.is_deleted.is_(False),
+        ))).scalars().all()
+    }
+    papers = (await db.execute(select(ExamSubject).where(
+        ExamSubject.tenant_id == user.tenant_id,
+        ExamSubject.is_deleted.is_(False),
+    ))).scalars().all()
+    return [
+        {
+            "id": str(paper.id),
+            "exam": exams[paper.exam_id].name if paper.exam_id in exams else "Exam",
+            "is_final_exam": exams[paper.exam_id].is_final_exam if paper.exam_id in exams else False,
+            "subject": maps["subjects"].get(paper.subject_id, "Subject"),
+            "grade": maps["grades"].get(paper.grade_id, "Class"),
+            "section": maps["sections"].get(paper.section_id, "Section"),
+            "max_marks": str(paper.max_marks),
+            "pass_marks": str(paper.pass_marks),
+            "pass_percentage": round(float(paper.pass_marks) / float(paper.max_marks) * 100, 2)
+            if paper.max_marks else 0,
+        }
+        for paper in papers
+        if (paper.grade_id, paper.section_id, paper.subject_id) in scopes
+    ]
+
+
+@router.put("/teacher/result-rules/{paper_id}")
+async def teacher_update_result_rule(
+    paper_id: uuid.UUID,
+    payload: ResultRuleIn,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    employee_id = await _linked_employee_id(db, user)
+    paper = await db.get(ExamSubject, paper_id)
+    if not paper or paper.tenant_id != user.tenant_id or paper.is_deleted:
+        raise HTTPException(404, "Examination subject not found")
+    assignment = (await db.execute(select(TeacherAssignment).where(
+        TeacherAssignment.tenant_id == user.tenant_id,
+        TeacherAssignment.reporting_manager_id == employee_id,
+        TeacherAssignment.grade_id == paper.grade_id,
+        TeacherAssignment.section_id == paper.section_id,
+        TeacherAssignment.subject_id == paper.subject_id,
+        TeacherAssignment.assignment_status == "active",
+        TeacherAssignment.is_deleted.is_(False),
+    ))).scalars().first()
+    if not assignment:
+        raise HTTPException(403, "Only the mapped HOD can configure this subject pass mark")
+    if payload.pass_marks <= 0 or payload.pass_marks >= paper.max_marks:
+        raise HTTPException(422, f"Pass marks must be greater than 0 and below {paper.max_marks}")
+    published = (await db.execute(select(MarksBatch).where(
+        MarksBatch.tenant_id == user.tenant_id,
+        MarksBatch.exam_id == paper.exam_id,
+        MarksBatch.subject_id == paper.subject_id,
+        MarksBatch.grade_id == paper.grade_id,
+        MarksBatch.section_id == paper.section_id,
+        MarksBatch.batch_status == "published",
+        MarksBatch.is_deleted.is_(False),
+    ))).scalars().first()
+    if published:
+        raise HTTPException(409, "Pass marks cannot change after results are published")
+    paper.pass_marks = payload.pass_marks
+    paper.updated_by = user.id
+    await db.flush()
+    await record_audit(
+        db,
+        action="update_pass_marks",
+        entity="ExamSubject",
+        entity_id=paper.id,
+        actor=user,
+        changes={"pass_marks": str(payload.pass_marks), "max_marks": str(paper.max_marks)},
+    )
+    return {"id": str(paper.id), "pass_marks": str(paper.pass_marks)}
+
+
 @router.get("/teacher/marks-sheet")
 async def teacher_marks_sheet(
     assignment_id: uuid.UUID,
@@ -1032,9 +1127,12 @@ async def teacher_review_marks(
         raise HTTPException(404, "Marks batch not found in your review queue")
     if batch.batch_status != "submitted":
         raise HTTPException(409, "Only submitted marks can be reviewed")
-    batch.batch_status = payload.decision
+    # HOD approval is the academic publication gate for the teacher workflow.
+    batch.batch_status = "published" if payload.decision == "approved" else "rejected"
     batch.review_note = payload.review_note
     batch.reviewed_at = datetime.now(timezone.utc)
+    if payload.decision == "approved":
+        batch.published_at = datetime.now(timezone.utc)
     batch.updated_by = user.id
     await db.flush()
     await record_audit(db, action=payload.decision, entity="MarksBatch", entity_id=batch.id, actor=user)

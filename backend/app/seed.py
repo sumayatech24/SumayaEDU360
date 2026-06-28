@@ -376,6 +376,10 @@ async def ensure_runtime_schema(db: AsyncSession) -> None:
         "ALTER TABLE employee ADD COLUMN IF NOT EXISTS address TEXT",
         "ALTER TABLE employee ADD COLUMN IF NOT EXISTS government_id_type VARCHAR(40)",
         "ALTER TABLE employee ADD COLUMN IF NOT EXISTS government_id_number VARCHAR(80)",
+        "ALTER TABLE exam ADD COLUMN IF NOT EXISTS weightage_percent NUMERIC(5,2) NOT NULL DEFAULT 100",
+        "ALTER TABLE exam ADD COLUMN IF NOT EXISTS is_final_exam BOOLEAN NOT NULL DEFAULT FALSE",
+        "ALTER TABLE exam ADD COLUMN IF NOT EXISTS overall_pass_percentage NUMERIC(5,2) NOT NULL DEFAULT 40",
+        "ALTER TABLE exam ADD COLUMN IF NOT EXISTS require_subject_pass BOOLEAN NOT NULL DEFAULT TRUE",
     ]
     for stmt in statements:
         await db.execute(text(stmt))
@@ -790,6 +794,31 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
                           "state": "present" if i % 4 else "absent", "method": "manual"},
             )
 
+    # Keep every configured class/section testable with a small but meaningful roster.
+    roster_names = [
+        ("Advait", "Kapoor", "Male"),
+        ("Myra", "Menon", "Female"),
+        ("Reyansh", "Das", "Male"),
+    ]
+    for section_index, section in enumerate(sections, start=1):
+        for student_index, (fn, ln, gender) in enumerate(roster_names, start=1):
+            await get_or_create(
+                db,
+                Student,
+                tenant_id=tid,
+                admission_no=f"DEMO-{section_index:02d}-{student_index:02d}",
+                defaults={
+                    "first_name": fn,
+                    "last_name": f"{ln} {section.name}",
+                    "gender": gender,
+                    "grade_id": section.grade_id,
+                    "section_id": section.id,
+                    "academic_year_id": ay.id,
+                    "roll_no": str(10 + student_index),
+                    "enrollment_status": "enrolled",
+                },
+            )
+
     # Demo staff attendance for today (mirrors the student flow)
     for j, emp in enumerate((await db.execute(select(Employee).where(
         Employee.tenant_id == tid, Employee.is_deleted.is_(False)
@@ -803,7 +832,7 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
     await get_or_create(
         db, Exam, tenant_id=tid, code="UT1-2526",
         defaults={"name": "Unit Test 1", "exam_type": "unit_test", "academic_year_id": ay.id,
-                  "max_marks": Decimal("100"), "pass_marks": Decimal("33")},
+                  "max_marks": Decimal("100"), "pass_marks": Decimal("40")},
     )
 
     # Admissions pipeline demo leads
@@ -937,7 +966,7 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
                     db, ExamSubject, tenant_id=tid, exam_id=exam.id, subject_id=sub.id,
                     grade_id=first_student.grade_id, section_id=first_student.section_id,
                     defaults={"exam_date": date(2026, 9, 10 + j), "max_marks": Decimal("100"),
-                              "pass_marks": Decimal("33"), "schedule_status": "scheduled"},
+                              "pass_marks": Decimal("40"), "schedule_status": "scheduled"},
                 )
                 await get_or_create(
                     db, MarksBatch, tenant_id=tid, exam_id=exam.id, subject_id=sub.id,
@@ -1107,7 +1136,10 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
                       "qualification": "M.A., B.Ed",
                       "reporting_manager_id": principal_emp.id if principal_emp else None},
         )
-        for sub in (await db.execute(select(Subject).where(Subject.tenant_id == tid).limit(3))).scalars().all():
+        assigned_subjects = (await db.execute(
+            select(Subject).where(Subject.tenant_id == tid).order_by(Subject.name).limit(3)
+        )).scalars().all()
+        for sub in assigned_subjects:
             await get_or_create(
                 db, TeacherAssignment, tenant_id=tid, employee_id=teacher_emp.id,
                 grade_id=grades[0].id if grades else None,
@@ -1116,6 +1148,53 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
                 defaults={"academic_year_id": ay.id, "reporting_manager_id": principal_emp.id if principal_emp else None,
                           "effective_from": date(2026, 4, 1), "assignment_status": "active"},
             )
+
+        # A clean annual assessment cycle for end-to-end marks and promotion testing.
+        # No marks batches are created here, so teachers can enter every roster from scratch.
+        cycle = [
+            ("PT1-DEMO", "Periodic Test 1 - Editable", "unit_test", Decimal("20"), False, date(2026, 7, 20)),
+            ("HY-DEMO", "Half Yearly Examination - Editable", "midterm", Decimal("30"), False, date(2026, 10, 12)),
+            ("FINAL-DEMO", "Final Examination - Editable", "final", Decimal("50"), True, date(2027, 3, 1)),
+        ]
+        cycle_subjects = assigned_subjects
+        for code, name, exam_type, weight, is_final, start_on in cycle:
+            cycle_exam, _ = await get_or_create(
+                db,
+                Exam,
+                tenant_id=tid,
+                code=code,
+                defaults={
+                    "name": name,
+                    "academic_year_id": ay.id,
+                    "exam_type": exam_type,
+                    "grade_id": grades[0].id,
+                    "start_date": start_on,
+                    "end_date": start_on,
+                    "max_marks": Decimal("100"),
+                    "pass_marks": Decimal("40"),
+                    "weightage_percent": weight,
+                    "is_final_exam": is_final,
+                    "overall_pass_percentage": Decimal("40"),
+                    "require_subject_pass": True,
+                },
+            )
+            for offset, sub in enumerate(cycle_subjects):
+                await get_or_create(
+                    db,
+                    ExamSubject,
+                    tenant_id=tid,
+                    exam_id=cycle_exam.id,
+                    subject_id=sub.id,
+                    grade_id=grades[0].id,
+                    section_id=sections[0].id,
+                    defaults={
+                        "assigned_teacher_id": teacher_emp.id,
+                        "exam_date": start_on.replace(day=min(start_on.day + offset, 28)),
+                        "max_marks": Decimal("100"),
+                        "pass_marks": Decimal("40"),
+                        "schedule_status": "scheduled",
+                    },
+                )
         # Make this teacher the class teacher of the first section
         if sections:
             sections[0].class_teacher_id = teacher_emp.id

@@ -435,7 +435,11 @@ class ExamBase(_C):
     start_date: date | None = None
     end_date: date | None = None
     max_marks: Decimal = Decimal(100)
-    pass_marks: Decimal = Decimal(33)
+    pass_marks: Decimal = Decimal(40)
+    weightage_percent: Decimal = Decimal(100)
+    is_final_exam: bool = False
+    overall_pass_percentage: Decimal = Decimal(40)
+    require_subject_pass: bool = True
 
 
 class ExamCreate(ExamBase):
@@ -451,6 +455,10 @@ class ExamUpdate(_C):
     end_date: date | None = None
     max_marks: Decimal | None = None
     pass_marks: Decimal | None = None
+    weightage_percent: Decimal | None = None
+    is_final_exam: bool | None = None
+    overall_pass_percentage: Decimal | None = None
+    require_subject_pass: bool | None = None
 
 
 class ExamOut(AuditedOut, ExamBase):

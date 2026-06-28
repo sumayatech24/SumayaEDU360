@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime, time
 
-from sqlalchemy import Date, DateTime, ForeignKey, Numeric, String, Text, Time, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Numeric, String, Text, Time, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -23,7 +23,11 @@ class Exam(BaseEntity, Base):
     start_date: Mapped[date] = mapped_column(Date, nullable=True)
     end_date: Mapped[date] = mapped_column(Date, nullable=True)
     max_marks: Mapped[Numeric] = mapped_column(Numeric(6, 2), default=100, nullable=False)
-    pass_marks: Mapped[Numeric] = mapped_column(Numeric(6, 2), default=33, nullable=False)
+    pass_marks: Mapped[Numeric] = mapped_column(Numeric(6, 2), default=40, nullable=False)
+    weightage_percent: Mapped[Numeric] = mapped_column(Numeric(5, 2), default=100, nullable=False)
+    is_final_exam: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    overall_pass_percentage: Mapped[Numeric] = mapped_column(Numeric(5, 2), default=40, nullable=False)
+    require_subject_pass: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
 
 class ExamSubject(BaseEntity, Base):
@@ -44,7 +48,7 @@ class ExamSubject(BaseEntity, Base):
     end_time: Mapped[time | None] = mapped_column(Time, nullable=True)
     room: Mapped[str | None] = mapped_column(String(60), nullable=True)
     max_marks: Mapped[Numeric] = mapped_column(Numeric(6, 2), default=100, nullable=False)
-    pass_marks: Mapped[Numeric] = mapped_column(Numeric(6, 2), default=33, nullable=False)
+    pass_marks: Mapped[Numeric] = mapped_column(Numeric(6, 2), default=40, nullable=False)
     schedule_status: Mapped[str] = mapped_column(String(30), default="scheduled", nullable=False)
 
 

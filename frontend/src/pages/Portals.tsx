@@ -770,6 +770,14 @@ function TeacherMarksReview() {
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [ruleValues, setRuleValues] = useState<Record<string, string>>({});
+  const { data: rules } = useQuery({
+    queryKey: ["portal-teacher-result-rules"],
+    queryFn: async () => (await api.get<any[]>("/portal/teacher/result-rules")).data,
+  });
+  useEffect(() => {
+    if (rules) setRuleValues(Object.fromEntries(rules.map((rule) => [rule.id, rule.pass_marks])));
+  }, [rules]);
   const { data } = useQuery({
     queryKey: ["portal-teacher-marks-review"],
     queryFn: async () => (await api.get<any[]>("/portal/teacher/marks-review")).data,
@@ -800,8 +808,48 @@ function TeacherMarksReview() {
     }
   }
 
+  async function saveRule(rule: any) {
+    setBusy(true);
+    setError("");
+    try {
+      await api.put(`/portal/teacher/result-rules/${rule.id}`, {
+        pass_marks: Number(ruleValues[rule.id]),
+      });
+      await qc.invalidateQueries({ queryKey: ["portal-teacher-result-rules"] });
+    } catch (e) {
+      setError(apiError(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-4">
+      <div className="card overflow-hidden">
+        <div className="border-b border-slate-100 px-4 py-3">
+          <h2 className="font-semibold">Subject Pass-Mark Master</h2>
+          <p className="text-xs text-slate-400">Configured by the mapped HOD before publication. The demo annual cycle starts at 40% for every subject.</p>
+        </div>
+        <div className="max-h-72 overflow-auto">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+              <tr><th className="px-4 py-3">Exam</th><th className="px-4 py-3">Class</th><th className="px-4 py-3">Subject</th><th className="px-4 py-3">Pass marks</th><th className="px-4 py-3"></th></tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rules?.map((rule) => (
+                <tr key={rule.id}>
+                  <td className="px-4 py-2.5">{rule.exam}{rule.is_final_exam ? " (Final)" : ""}</td>
+                  <td className="px-4 py-2.5">{rule.grade}/{rule.section}</td>
+                  <td className="px-4 py-2.5">{rule.subject}</td>
+                  <td className="px-4 py-2.5"><div className="flex items-center gap-1"><input className="input h-9 w-20" type="number" min="1" max={Number(rule.max_marks) - 1} value={ruleValues[rule.id] ?? rule.pass_marks} onChange={(e) => setRuleValues((values) => ({ ...values, [rule.id]: e.target.value }))} /><span className="text-xs text-slate-400">/ {rule.max_marks}</span></div></td>
+                  <td className="px-4 py-2.5"><button className="btn-ghost" disabled={busy || Number(ruleValues[rule.id]) === Number(rule.pass_marks)} onClick={() => void saveRule(rule)}>Save</button></td>
+                </tr>
+              ))}
+              {rules && rules.length === 0 && <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-400">No class-subject rules mapped to this HOD.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
       <div className="card overflow-hidden">
         <div className="border-b border-slate-100 px-4 py-3">
           <h2 className="font-semibold">HOD Marks Approval</h2>
@@ -844,7 +892,7 @@ function TeacherMarksReview() {
               <label><span className="label">HOD note</span><textarea className="input min-h-20" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Optional for approval; required when returning" /></label>
               {error && <div className="text-sm text-rose-600">{error}</div>}
               <div className="flex gap-2">
-                <button className="btn-primary" disabled={busy} onClick={() => void review("approved")}>Approve & lock marks</button>
+                <button className="btn-primary" disabled={busy} onClick={() => void review("approved")}>Approve, publish & lock</button>
                 <button className="btn-ghost border border-rose-200 text-rose-600" disabled={busy} onClick={() => void review("rejected")}>Return to teacher</button>
               </div>
             </div>

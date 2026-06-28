@@ -350,6 +350,118 @@ async def test_teacher_bulk_marks_entry_and_hod_lock(client):
 
 
 @pytest.mark.asyncio
+async def test_annual_cumulative_results_leaders_failures_and_promotion(client):
+    teacher = await _login(client, "teacher@sumaya.edu", "Teacher@123")
+    hod = await _login(client, "hod@sumaya.edu", "Hod@123")
+    admin = await _login(client, "admin@sumaya.edu", "Admin@123")
+    options = (await client.get(
+        "/api/v1/portal/teacher/marks-entry-options", headers=teacher
+    )).json()["assignments"]
+    assignments = [assignment for assignment in options if any(
+        exam["code"] == "FINAL-DEMO" for exam in assignment["exams"]
+    )]
+    assert len(assignments) == 3
+    grade_id = assignments[0]["grade_id"]
+    section_id = assignments[0]["section_id"]
+
+    submitted_batches = []
+    final_exam_id = None
+    for assignment in assignments:
+        cycle_exams = [
+            exam for exam in assignment["exams"]
+            if exam["code"] in {"PT1-DEMO", "HY-DEMO", "FINAL-DEMO"}
+        ]
+        assert len(cycle_exams) == 3
+        for exam in cycle_exams:
+            if exam["code"] == "FINAL-DEMO":
+                final_exam_id = exam["id"]
+            sheet = await client.get(
+                "/api/v1/portal/teacher/marks-sheet",
+                params={"assignment_id": assignment["id"], "exam_id": exam["id"]},
+                headers=teacher,
+            )
+            assert sheet.status_code == 200, sheet.text
+            rows = sheet.json()["rows"]
+            assert len(rows) >= 3
+            entries = []
+            for index, row in enumerate(rows):
+                mark = 95 if index == 0 else 72 if index == 1 else 30 if index == 2 else 62
+                entries.append({
+                    "student_id": row["student_id"],
+                    "marks_obtained": mark,
+                    "is_absent": False,
+                })
+            submitted = await client.post(
+                "/api/v1/portal/teacher/marks-sheet/submit",
+                headers=teacher,
+                json={
+                    "assignment_id": assignment["id"],
+                    "exam_id": exam["id"],
+                    "entries": entries,
+                },
+            )
+            assert submitted.status_code == 200, submitted.text
+            submitted_batches.append(submitted.json()["id"])
+
+    assert final_exam_id
+    rules = await client.get("/api/v1/portal/teacher/result-rules", headers=hod)
+    assert rules.status_code == 200, rules.text
+    demo_rules = [rule for rule in rules.json() if "Editable" in rule["exam"]]
+    assert len(demo_rules) == 9
+    assert all(float(rule["pass_percentage"]) == 40 for rule in demo_rules)
+
+    for batch_id in submitted_batches:
+        approved = await client.post(
+            f"/api/v1/portal/teacher/marks-review/{batch_id}",
+            headers=hod,
+            json={"decision": "approved", "review_note": "Annual marks verified"},
+        )
+        assert approved.status_code == 200, approved.text
+        assert approved.json()["status"] == "published"
+
+    eligibility = await client.get(
+        "/api/v1/promotion/eligibility",
+        headers=admin,
+        params={
+            "from_grade_id": grade_id,
+            "section_id": section_id,
+            "exam_id": final_exam_id,
+        },
+    )
+    assert eligibility.status_code == 200, eligibility.text
+    result = eligibility.json()
+    assert result["review_status"] == "published"
+    assert [exam["weightage_percent"] for exam in result["included_exams"]] == [20, 30, 50]
+    assert result["summary"]["eligible"] >= 2
+    assert result["summary"]["failed"] >= 1
+    assert result["leaders"][0]["percentage"] == 95
+    assert result["failed_students"][0]["failed_subjects"]
+
+    grades = (await client.get("/api/v1/grades", headers=admin, params={"page_size": 100})).json()["items"]
+    source = next(grade for grade in grades if grade["id"] == grade_id)
+    target = min((grade for grade in grades if grade["sequence"] > source["sequence"]),
+                 key=lambda grade: grade["sequence"])
+    target_sections = (await client.get(
+        "/api/v1/sections", headers=admin, params={"page_size": 200}
+    )).json()["items"]
+    target_section = next(section for section in target_sections if section["grade_id"] == target["id"])
+    promoted = await client.post(
+        "/api/v1/promotion/run",
+        headers=admin,
+        json={
+            "from_grade_id": grade_id,
+            "from_section_id": section_id,
+            "to_grade_id": target["id"],
+            "to_section_id": target_section["id"],
+            "exam_id": final_exam_id,
+            "student_ids": [row["student_id"] for row in result["rows"] if row["eligible"]],
+        },
+    )
+    assert promoted.status_code == 200, promoted.text
+    assert promoted.json()["promoted"] == result["summary"]["eligible"]
+
+
+@pytest.mark.asyncio
 async def test_complete_new_admission_lifecycle(client):
     config = (await client.get("/api/v1/public/admissions/SUMAYA/config")).json()
     grade = config["grades"][0]

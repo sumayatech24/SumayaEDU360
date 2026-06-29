@@ -209,6 +209,8 @@ function Student360View({ childView }: { childView?: boolean }) {
         <AnnouncementsCard items={data.announcements} />
       </div>
 
+      <LearningMaterialsCard scope="student" />
+
       <div className="card p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -643,6 +645,39 @@ const RES_ICON: Record<string, string> = {
   document: "📄", notes: "📝", video: "🎬", ebook: "📚", recording: "🎧", link: "🔗",
 };
 
+/** Compact dashboard card showing the latest few learning materials. */
+function LearningMaterialsCard({ scope }: { scope: "student" | "teacher" }) {
+  const { data } = useQuery({
+    queryKey: ["learning-materials", scope],
+    queryFn: async () => (await api.get<LearningMaterial[]>(`/portal/${scope}/learning-materials`)).data,
+  });
+  const items = (data ?? []).slice(0, 4);
+  return (
+    <div className="card p-5">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-slate-600">Latest Learning Material</h3>
+        <span className="text-xs text-slate-400">{data?.length ?? 0} shared</span>
+      </div>
+      {items.length === 0 && <p className="text-sm text-slate-400">Nothing shared yet.</p>}
+      <div className="space-y-2">
+        {items.map((m) => (
+          <div key={m.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 px-3 py-2">
+            <div className="min-w-0">
+              <div className="truncate text-sm font-medium">{RES_ICON[m.resource_type] || "📄"} {m.title}</div>
+              <div className="truncate text-[11px] capitalize text-slate-400">
+                {m.audience}{m.subject ? ` · ${m.subject}` : ""}{m.grade ? ` · ${m.grade}` : ""}
+              </div>
+            </div>
+            {m.url && (
+              <a href={m.url} target="_blank" rel="noreferrer" className="shrink-0 text-xs font-medium text-brand-600 hover:underline">Open</a>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function LearningMaterialsView({ scope }: { scope: "student" | "teacher" }) {
   const { data, isLoading } = useQuery({
     queryKey: ["learning-materials", scope],
@@ -867,7 +902,10 @@ function TeacherHome() {
           </div>
         ))}
       </div>
-      <AnnouncementsCard items={data?.announcements ?? []} />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <LearningMaterialsCard scope="teacher" />
+        <AnnouncementsCard items={data?.announcements ?? []} />
+      </div>
     </div>
   );
 }

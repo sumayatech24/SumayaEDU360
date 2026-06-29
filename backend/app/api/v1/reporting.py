@@ -34,6 +34,8 @@ from app.models.student_records import (
     Achievement,
     DisciplinaryAction,
     StudentAcademicHistory,
+    StudentConsent,
+    StudentMedicalRecord,
     StudentRemark,
 )
 from app.models.transport import StudentTransportAssignment, TransportRoute
@@ -405,6 +407,20 @@ async def student_360(
             StudentRemark.tenant_id == tid, StudentRemark.student_id == student.id,
             StudentRemark.is_deleted.is_(False)).order_by(StudentRemark.remarked_on.desc()))
     ).scalars().all()
+    medical_records = (
+        await db.execute(select(StudentMedicalRecord).where(
+            StudentMedicalRecord.tenant_id == tid,
+            StudentMedicalRecord.student_id == student.id,
+            StudentMedicalRecord.visible_to_parent.is_(True),
+            StudentMedicalRecord.is_deleted.is_(False),
+        ).order_by(StudentMedicalRecord.recorded_on.desc()))
+    ).scalars().all()
+    consents = (
+        await db.execute(select(StudentConsent).where(
+            StudentConsent.tenant_id == tid, StudentConsent.student_id == student.id,
+            StudentConsent.is_deleted.is_(False),
+        ).order_by(StudentConsent.requested_on.desc()))
+    ).scalars().all()
 
     # Activities the student is enrolled in
     activity_names = await _name_map(db, Activity, tid, lambda a: a.name)
@@ -573,6 +589,18 @@ async def student_360(
             {"type": r.remark_type, "remark": r.remark, "by": r.remarked_by, "date": _s(r.remarked_on),
              "visible_to_parent": r.is_visible_to_parent}
             for r in remarks
+        ],
+        "medical_records": [
+            {"type": r.record_type, "date": _s(r.recorded_on), "condition": r.condition,
+             "details": r.details, "medication": r.medication,
+             "emergency_action": r.emergency_action, "valid_until": _s(r.valid_until)}
+            for r in medical_records
+        ],
+        "consents": [
+            {"id": str(r.id), "type": r.consent_type, "status": r.consent_status,
+             "policy_version": r.policy_version, "requested_on": _s(r.requested_on),
+             "responded_on": _s(r.responded_on), "expires_on": _s(r.expires_on)}
+            for r in consents
         ],
         "activities": [
             {"name": activity_names.get(r.activity_id, "—"), "status": r.registration_status,

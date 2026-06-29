@@ -114,9 +114,12 @@ from app.models.people import (  # noqa: F401
 )
 from app.models.student_records import (  # noqa: F401
     Achievement,
+    AlumniProfile,
     DisciplinaryAction,
     StudentAcademicHistory,
+    StudentConsent,
     StudentLifecycleRequest,
+    StudentMedicalRecord,
     StudentRemark,
 )
 from app.models.tenant import Campus, Institution, Tenant  # noqa: F401

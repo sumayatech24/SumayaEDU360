@@ -173,6 +173,88 @@ function StudentLifecycle({ studentId, studentStatus }: { studentId: string; stu
   );
 }
 
+function HealthAndConsent({ studentId }: { studentId: string }) {
+  const qc = useQueryClient();
+  const [error, setError] = useState("");
+  const [medical, setMedical] = useState({ record_type: "medical", condition: "", details: "" });
+  const [consent, setConsent] = useState({ consent_type: "photo_media", policy_version: "1.0" });
+  const records = useQuery({
+    queryKey: ["student-medical", studentId],
+    queryFn: async () => (await api.get<any[]>(`/student-lifecycle/students/${studentId}/medical-records`)).data,
+  });
+  const consents = useQuery({
+    queryKey: ["student-consents", studentId],
+    queryFn: async () => (await api.get<any[]>(`/student-lifecycle/students/${studentId}/consents`)).data,
+  });
+  const addMedical = useMutation({
+    mutationFn: async () => api.post(`/student-lifecycle/students/${studentId}/medical-records`, {
+      ...medical, recorded_on: new Date().toISOString().slice(0, 10), visible_to_parent: true,
+    }),
+    onSuccess: () => {
+      setMedical({ record_type: "medical", condition: "", details: "" });
+      qc.invalidateQueries({ queryKey: ["student-medical", studentId] });
+    },
+    onError: (e) => setError(apiError(e)),
+  });
+  const requestConsent = useMutation({
+    mutationFn: async () => api.post(`/student-lifecycle/students/${studentId}/consents`, consent),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["student-consents", studentId] }),
+    onError: (e) => setError(apiError(e)),
+  });
+  const respond = useMutation({
+    mutationFn: async ({ id, decision }: { id: string; decision: string }) => {
+      const guardian_name = window.prompt("Guardian name confirming this decision");
+      if (!guardian_name) throw new Error("Guardian name is required");
+      return api.post(`/student-lifecycle/consents/${id}/respond`, { decision, guardian_name });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["student-consents", studentId] }),
+    onError: (e) => setError(apiError(e)),
+  });
+  return (
+    <Section title="Medical & Consent Vault">
+      {error && <div className="mb-3 rounded-lg bg-rose-50 p-2 text-xs text-rose-600">{error}</div>}
+      <div className="grid gap-4 md:grid-cols-2">
+        <div>
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Restricted health records</div>
+          <div className="grid gap-2">
+            <select className="input" value={medical.record_type} onChange={(e) => setMedical({ ...medical, record_type: e.target.value })}>
+              <option value="medical">Medical condition</option><option value="allergy">Allergy</option>
+              <option value="immunization">Immunization</option><option value="emergency">Emergency instruction</option>
+            </select>
+            <input className="input" placeholder="Condition / record title" value={medical.condition} onChange={(e) => setMedical({ ...medical, condition: e.target.value })} />
+            <input className="input" placeholder="Details" value={medical.details} onChange={(e) => setMedical({ ...medical, details: e.target.value })} />
+            <button className="btn-primary text-xs" disabled={medical.condition.trim().length < 2 || addMedical.isPending} onClick={() => addMedical.mutate()}>Add health record</button>
+          </div>
+          <div className="mt-3 space-y-2">
+            {(records.data ?? []).map((r: any) => <div key={r.id} className="rounded-lg bg-slate-50 p-2 text-xs"><span className="font-semibold capitalize">{r.record_type}</span> · {r.condition}<div className="text-slate-500">{r.details || "No additional details"} · {r.recorded_on}</div></div>)}
+            {!records.data?.length && <p className="text-xs text-slate-400">No health records.</p>}
+          </div>
+        </div>
+        <div>
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Versioned guardian consent</div>
+          <div className="flex gap-2">
+            <select className="input" value={consent.consent_type} onChange={(e) => setConsent({ ...consent, consent_type: e.target.value })}>
+              <option value="photo_media">Photo & media</option><option value="field_trip">Field trip</option>
+              <option value="medical_treatment">Emergency medical treatment</option><option value="data_processing">Data processing</option>
+            </select>
+            <input className="input w-24" value={consent.policy_version} onChange={(e) => setConsent({ ...consent, policy_version: e.target.value })} />
+            <button className="btn-primary whitespace-nowrap text-xs" onClick={() => requestConsent.mutate()}>Request</button>
+          </div>
+          <div className="mt-3 space-y-2">
+            {(consents.data ?? []).map((c: any) => <div key={c.id} className="rounded-lg border border-slate-100 p-2 text-xs">
+              <div className="flex justify-between"><span className="font-semibold capitalize">{c.consent_type.replace(/_/g, " ")}</span><span className="badge bg-slate-100 capitalize">{c.status}</span></div>
+              <div className="text-slate-500">Policy {c.policy_version} · requested {c.requested_on}</div>
+              {c.status === "pending" && <div className="mt-2 flex gap-2"><button className="btn-primary text-xs" onClick={() => respond.mutate({ id: c.id, decision: "granted" })}>Grant</button><button className="btn-ghost text-xs" onClick={() => respond.mutate({ id: c.id, decision: "declined" })}>Decline</button></div>}
+              {c.status === "granted" && <button className="btn-ghost mt-2 text-xs text-rose-600" onClick={() => respond.mutate({ id: c.id, decision: "revoked" })}>Revoke</button>}
+            </div>)}
+            {!consents.data?.length && <p className="text-xs text-slate-400">No consent requests.</p>}
+          </div>
+        </div>
+      </div>
+    </Section>
+  );
+}
+
 export function StudentProfile() {
   const { id = "" } = useParams();
   const branding = useBranding();
@@ -299,6 +381,8 @@ export function StudentProfile() {
         </Section>
 
         <StudentLifecycle studentId={id} studentStatus={s.status} />
+
+        <HealthAndConsent studentId={id} />
 
         <Section title="Disciplinary Actions" count={data.discipline.length}>
           <Table

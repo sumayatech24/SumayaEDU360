@@ -30,6 +30,7 @@ from app.models.operations import (
     Activity, ActivityRegistration, Announcement, Facility, FacilityBooking,
 )
 from app.models.people import Employee, Student, TeacherAssignment, TeacherProfile
+from app.models.student_records import StudentConsent
 
 router = APIRouter(prefix="/portal", tags=["Portals"])
 
@@ -112,6 +113,12 @@ class MarksReviewIn(BaseModel):
 
 class ResultRuleIn(BaseModel):
     pass_marks: Decimal
+
+
+class PortalConsentResponseIn(BaseModel):
+    decision: str
+    guardian_name: str
+    notes: str | None = None
 
 
 def portal_for(roles: list[str], is_super: bool) -> str:
@@ -223,6 +230,31 @@ async def student_dashboard(
         data["remarks"] = [r for r in data["remarks"] if r.get("visible_to_parent", True)]
 
     return data
+
+
+@router.post("/parent/consents/{consent_id}/respond")
+async def parent_consent_response(
+    consent_id: uuid.UUID,
+    payload: PortalConsentResponseIn,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    if "parent" not in user.roles:
+        raise HTTPException(403, "Parent portal access required")
+    student_id = await _linked_student_id(db, user)
+    row = await db.get(StudentConsent, consent_id)
+    if not row or row.tenant_id != user.tenant_id or row.student_id != student_id or row.is_deleted:
+        raise HTTPException(404, "Consent request not found")
+    if payload.decision not in ("granted", "declined", "revoked"):
+        raise HTTPException(422, "Decision must be granted, declined or revoked")
+    if payload.decision == "revoked" and row.consent_status != "granted":
+        raise HTTPException(409, "Only granted consent can be revoked")
+    if payload.decision != "revoked" and row.consent_status != "pending":
+        raise HTTPException(409, "Only pending consent can be answered")
+    row.consent_status, row.responded_on = payload.decision, date.today()
+    row.guardian_name, row.response_notes, row.updated_by = payload.guardian_name, payload.notes, user.id
+    await record_audit(db, action=payload.decision, entity="StudentConsent", entity_id=row.id, actor=user)
+    return {"id": str(row.id), "status": row.consent_status}
 
 
 @router.get("/student/homework")

@@ -94,3 +94,56 @@ class StudentLifecycleRequest(BaseEntity, Base):
     completed_on: Mapped[date | None] = mapped_column(Date, nullable=True)
     certificate_no: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
     certificate_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+
+class StudentMedicalRecord(BaseEntity, Base):
+    """Restricted student health record; portal exposure is explicitly controlled."""
+
+    __tablename__ = "student_medical_record"
+
+    student_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("student.id"), index=True)
+    record_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    recorded_on: Mapped[date] = mapped_column(Date, nullable=False)
+    condition: Mapped[str] = mapped_column(String(200), nullable=False)
+    details: Mapped[str | None] = mapped_column(Text, nullable=True)
+    medication: Mapped[str | None] = mapped_column(Text, nullable=True)
+    doctor_name: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    emergency_action: Mapped[str | None] = mapped_column(Text, nullable=True)
+    valid_until: Mapped[date | None] = mapped_column(Date, nullable=True)
+    visible_to_parent: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+
+class StudentConsent(BaseEntity, Base):
+    __tablename__ = "student_consent"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "student_id", "consent_type", name="uq_student_consent_type"),
+    )
+
+    student_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("student.id"), index=True)
+    consent_type: Mapped[str] = mapped_column(String(60), nullable=False)
+    consent_status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    # pending / granted / declined / revoked / expired
+    policy_version: Mapped[str] = mapped_column(String(30), nullable=False)
+    requested_on: Mapped[date] = mapped_column(Date, nullable=False)
+    responded_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    expires_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    guardian_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    response_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class AlumniProfile(BaseEntity, Base):
+    __tablename__ = "alumni_profile"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "student_id", name="uq_alumni_student"),
+    )
+
+    student_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("student.id"), index=True)
+    graduation_year: Mapped[int] = mapped_column(Integer, nullable=False)
+    leaving_class: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    final_result: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    personal_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    personal_phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    higher_education: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    occupation: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    employer: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    directory_opt_in: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

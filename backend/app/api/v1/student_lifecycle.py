@@ -19,7 +19,12 @@ from app.models.hostel import HostelAllocation, HostelBed, HostelRoom
 from app.models.library import BookIssue
 from app.models.operations import AssetAssignment
 from app.models.people import Student
-from app.models.student_records import StudentLifecycleRequest
+from app.models.student_records import (
+    AlumniProfile,
+    StudentConsent,
+    StudentLifecycleRequest,
+    StudentMedicalRecord,
+)
 from app.models.transport import StudentTransportAssignment
 
 router = APIRouter(prefix="/student-lifecycle", tags=["Student lifecycle"])
@@ -38,6 +43,42 @@ class RequestIn(BaseModel):
 class DecisionIn(BaseModel):
     remarks: str | None = Field(default=None, max_length=2000)
     override_clearance: bool = False
+
+
+class MedicalRecordIn(BaseModel):
+    record_type: str = Field(min_length=2, max_length=40)
+    recorded_on: date
+    condition: str = Field(min_length=2, max_length=200)
+    details: str | None = None
+    medication: str | None = None
+    doctor_name: str | None = Field(default=None, max_length=150)
+    emergency_action: str | None = None
+    valid_until: date | None = None
+    visible_to_parent: bool = True
+
+
+class ConsentIn(BaseModel):
+    consent_type: str = Field(min_length=2, max_length=60)
+    policy_version: str = Field(min_length=1, max_length=30)
+    expires_on: date | None = None
+
+
+class ConsentResponseIn(BaseModel):
+    decision: str
+    guardian_name: str = Field(min_length=2, max_length=200)
+    notes: str | None = None
+
+
+class AlumniIn(BaseModel):
+    graduation_year: int = Field(ge=1950, le=2200)
+    leaving_class: str | None = Field(default=None, max_length=100)
+    final_result: str | None = Field(default=None, max_length=60)
+    personal_email: str | None = Field(default=None, max_length=255)
+    personal_phone: str | None = Field(default=None, max_length=32)
+    higher_education: str | None = Field(default=None, max_length=255)
+    occupation: str | None = Field(default=None, max_length=200)
+    employer: str | None = Field(default=None, max_length=200)
+    directory_opt_in: bool = False
 
 
 async def _case(db: AsyncSession, tid: uuid.UUID, case_id: uuid.UUID) -> StudentLifecycleRequest:
@@ -105,6 +146,178 @@ async def _out(db: AsyncSession, row: StudentLifecycleRequest) -> dict:
         "certificate": row.certificate_snapshot,
         "created_at": row.created_at.isoformat() if row.created_at else None,
     }
+
+
+async def _student(db: AsyncSession, tid: uuid.UUID, student_id: uuid.UUID) -> Student:
+    row = await db.get(Student, student_id)
+    if not row or row.tenant_id != tid or row.is_deleted:
+        raise HTTPException(404, "Student not found")
+    return row
+
+
+@router.get("/students/{student_id}/medical-records")
+async def medical_records(
+    student_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_permission("student_information_system:read")),
+):
+    await _student(db, user.tenant_id, student_id)
+    rows = (await db.execute(select(StudentMedicalRecord).where(
+        StudentMedicalRecord.tenant_id == user.tenant_id,
+        StudentMedicalRecord.student_id == student_id,
+        StudentMedicalRecord.is_deleted.is_(False),
+    ).order_by(StudentMedicalRecord.recorded_on.desc()))).scalars().all()
+    return [{
+        "id": str(r.id), "record_type": r.record_type, "recorded_on": r.recorded_on.isoformat(),
+        "condition": r.condition, "details": r.details, "medication": r.medication,
+        "doctor_name": r.doctor_name, "emergency_action": r.emergency_action,
+        "valid_until": r.valid_until.isoformat() if r.valid_until else None,
+        "visible_to_parent": r.visible_to_parent,
+    } for r in rows]
+
+
+@router.post("/students/{student_id}/medical-records", status_code=status.HTTP_201_CREATED)
+async def add_medical_record(
+    student_id: uuid.UUID,
+    payload: MedicalRecordIn,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_permission("student_information_system:update")),
+):
+    await _student(db, user.tenant_id, student_id)
+    row = StudentMedicalRecord(
+        tenant_id=user.tenant_id, student_id=student_id, **payload.model_dump(),
+        created_by=user.id, updated_by=user.id,
+    )
+    db.add(row)
+    await db.flush()
+    await record_audit(db, action="create", entity="StudentMedicalRecord", entity_id=row.id, actor=user,
+                       changes={"record_type": row.record_type, "condition": row.condition})
+    return {"id": str(row.id), "status": "created"}
+
+
+@router.get("/students/{student_id}/consents")
+async def consents(
+    student_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_permission("student_information_system:read")),
+):
+    await _student(db, user.tenant_id, student_id)
+    rows = (await db.execute(select(StudentConsent).where(
+        StudentConsent.tenant_id == user.tenant_id, StudentConsent.student_id == student_id,
+        StudentConsent.is_deleted.is_(False),
+    ).order_by(StudentConsent.requested_on.desc()))).scalars().all()
+    return [{
+        "id": str(r.id), "consent_type": r.consent_type, "status": r.consent_status,
+        "policy_version": r.policy_version, "requested_on": r.requested_on.isoformat(),
+        "responded_on": r.responded_on.isoformat() if r.responded_on else None,
+        "expires_on": r.expires_on.isoformat() if r.expires_on else None,
+        "guardian_name": r.guardian_name, "notes": r.response_notes,
+    } for r in rows]
+
+
+@router.post("/students/{student_id}/consents", status_code=status.HTTP_201_CREATED)
+async def request_consent(
+    student_id: uuid.UUID,
+    payload: ConsentIn,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_permission("student_information_system:update")),
+):
+    await _student(db, user.tenant_id, student_id)
+    existing = (await db.execute(select(StudentConsent).where(
+        StudentConsent.tenant_id == user.tenant_id, StudentConsent.student_id == student_id,
+        StudentConsent.consent_type == payload.consent_type, StudentConsent.is_deleted.is_(False),
+    ))).scalars().first()
+    if existing:
+        existing.policy_version = payload.policy_version
+        existing.expires_on = payload.expires_on
+        existing.requested_on = date.today()
+        existing.responded_on = None
+        existing.guardian_name = None
+        existing.response_notes = None
+        existing.consent_status = "pending"
+        row = existing
+    else:
+        row = StudentConsent(
+            tenant_id=user.tenant_id, student_id=student_id, requested_on=date.today(),
+            **payload.model_dump(), created_by=user.id, updated_by=user.id,
+        )
+        db.add(row)
+    await db.flush()
+    await record_audit(db, action="request", entity="StudentConsent", entity_id=row.id, actor=user)
+    return {"id": str(row.id), "status": row.consent_status}
+
+
+@router.post("/consents/{consent_id}/respond")
+async def respond_consent(
+    consent_id: uuid.UUID,
+    payload: ConsentResponseIn,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_permission("student_information_system:update")),
+):
+    if payload.decision not in ("granted", "declined", "revoked"):
+        raise HTTPException(422, "Decision must be granted, declined or revoked")
+    row = await db.get(StudentConsent, consent_id)
+    if not row or row.tenant_id != user.tenant_id or row.is_deleted:
+        raise HTTPException(404, "Consent not found")
+    if payload.decision == "revoked" and row.consent_status != "granted":
+        raise HTTPException(409, "Only granted consent can be revoked")
+    if payload.decision != "revoked" and row.consent_status != "pending":
+        raise HTTPException(409, "Only pending consent can be answered")
+    row.consent_status, row.responded_on = payload.decision, date.today()
+    row.guardian_name, row.response_notes, row.updated_by = payload.guardian_name, payload.notes, user.id
+    await record_audit(db, action=payload.decision, entity="StudentConsent", entity_id=row.id, actor=user)
+    return {"id": str(row.id), "status": row.consent_status}
+
+
+@router.post("/students/{student_id}/alumni", status_code=status.HTTP_201_CREATED)
+async def convert_to_alumni(
+    student_id: uuid.UUID,
+    payload: AlumniIn,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_permission("student_information_system:approve")),
+):
+    student = await _student(db, user.tenant_id, student_id)
+    if student.enrollment_status != "graduated":
+        raise HTTPException(409, "Student must complete graduation before alumni conversion")
+    existing = (await db.execute(select(AlumniProfile).where(
+        AlumniProfile.tenant_id == user.tenant_id, AlumniProfile.student_id == student_id,
+        AlumniProfile.is_deleted.is_(False),
+    ))).scalars().first()
+    if existing:
+        raise HTTPException(409, "Alumni profile already exists")
+    row = AlumniProfile(
+        tenant_id=user.tenant_id, student_id=student_id, **payload.model_dump(),
+        created_by=user.id, updated_by=user.id,
+    )
+    db.add(row)
+    student.enrollment_status = "alumni"
+    await db.flush()
+    await record_audit(db, action="convert", entity="AlumniProfile", entity_id=row.id, actor=user)
+    return {"id": str(row.id), "student_id": str(student_id), "status": "alumni"}
+
+
+@router.get("/duplicates")
+async def duplicate_candidates(
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_permission("student_information_system:read")),
+):
+    rows = (await db.execute(select(Student).where(
+        Student.tenant_id == user.tenant_id, Student.is_deleted.is_(False),
+    ).order_by(Student.first_name, Student.last_name))).scalars().all()
+    groups: dict[tuple, list[Student]] = {}
+    for student in rows:
+        key = (
+            student.first_name.strip().lower(),
+            (student.last_name or "").strip().lower(),
+            student.date_of_birth,
+        )
+        groups.setdefault(key, []).append(student)
+    return [{
+        "match_reason": "same name and date of birth",
+        "students": [{"id": str(s.id), "admission_no": s.admission_no,
+                      "name": f"{s.first_name} {s.last_name or ''}".strip(),
+                      "status": s.enrollment_status, "phone": s.phone} for s in candidates],
+    } for candidates in groups.values() if len(candidates) > 1 and candidates[0].date_of_birth]
 
 
 @router.get("")

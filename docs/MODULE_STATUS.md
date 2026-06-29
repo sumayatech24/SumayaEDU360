@@ -29,7 +29,7 @@ four delivery states:
 | Done first | Admissions CRM | **End-to-end** | Public applicant login/form/tracking; internal continuation application; per-document and eligibility verification; decision; class/section allocation; pre-enrollment fee/receipt; new enrollment or existing-student promotion; capacity guard. |
 | P1 | Academic Configuration | CRUD / thin screen | Admission windows, class capacity planning, terms/calendars, subject-class mapping rules, rollover controls. |
 | P1 | Fees & Billing | Functional partial | Fee-plan components UI, bulk invoice generation, concessions/scholarships, overdue rules, refunds, online payment reconciliation, cashier close. |
-| P1 | Student Information System | Functional partial | Transfer/withdrawal/TC, re-enrollment, document vault, medical/consent records, alumni lifecycle, duplicate/merge controls. |
+| P1 | Student Information System | Functional partial | Transfer/withdrawal/TC and re-enrollment are now guarded end-to-end with live fee/library/asset/hostel clearance, approval, class restoration, automatic hostel/transport closure, certificate snapshots and profile UI. Remaining: medical/consent vault, alumni lifecycle, duplicate/merge controls. |
 | P1 | Examination + Report Cards | Functional partial | Exam schemes, grading rules, moderation, absent/retest handling, consolidated report publishing, transcript history. |
 | P1 | Attendance | Functional partial | Timetable-backed sessions, leave/late/half-day rules, correction approval, parent alerts, monthly lock. |
 | P2 | Teacher Management | CRUD / thin screen | Recruitment/onboarding, qualifications and compliance, workload planning, substitute allocation, appraisal. |
@@ -57,7 +57,7 @@ Admissions rather than expanding all modules horizontally.
 |---|--------|------|-------|
 | M001 | Public Website & CMS | **Workflow** | Bespoke screen: pages (Publish/Unpublish) + banners |
 | M002 | Admissions CRM | **Workflow** | Pipeline board, stage transitions, convert-to-student |
-| M003 | Student Information System | **Workflow** | Students typed CRUD + promotion lifecycle |
+| M003 | Student Information System | **Workflow** | Students typed CRUD, marks-gated promotion, transfer/withdrawal approval, clearance, TC issuance and re-enrollment |
 | M004 | Parent & Guardian Portal | **Workflow** | Student-360 view plus self-scoped homework, timetable and activities |
 | M005 | Teacher Management | Typed CRUD | via Employees; dedicated teacher screen TBD |
 | M006 | Employee HRMS | **Workflow** | Employees + leave apply/approve + payroll run |

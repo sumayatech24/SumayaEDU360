@@ -17,7 +17,10 @@ class LearningResource(BaseEntity, Base):
     title: Mapped[str] = mapped_column(String(250), nullable=False)
     resource_type: Mapped[str] = mapped_column(String(30), default="document", nullable=False)
     # document / video / ebook / notes / recording / link
+    # Who the material is shared with: general (everyone) / students / teachers.
+    audience: Mapped[str] = mapped_column(String(20), default="general", nullable=False, index=True)
     subject_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("subject.id"), nullable=True)
+    # When grade is set the material is class-scoped to that grade; null = all classes.
     grade_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("grade.id"), nullable=True)
     url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)

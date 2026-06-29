@@ -50,6 +50,72 @@ async def test_login_requires_credentials(client):
 
 
 @pytest.mark.asyncio
+async def test_student_transfer_tc_and_reenrollment_lifecycle(client):
+    admin = await _login(client, "admin@sumaya.edu", "Admin@123")
+    grades = (await client.get("/api/v1/grades", headers=admin, params={"page_size": 100})).json()["items"]
+    sections = (await client.get("/api/v1/sections", headers=admin, params={"page_size": 100})).json()["items"]
+    section = sections[0]
+    grade = next(g for g in grades if g["id"] == section["grade_id"])
+    created = await client.post("/api/v1/students", headers=admin, json={
+        "admission_no": "LIFECYCLE-001",
+        "first_name": "Lifecycle",
+        "last_name": "Student",
+        "grade_id": grade["id"],
+        "section_id": section["id"],
+        "enrollment_status": "enrolled",
+    })
+    assert created.status_code == 201, created.text
+    student_id = created.json()["id"]
+
+    request = await client.post("/api/v1/student-lifecycle", headers=admin, json={
+        "student_id": student_id,
+        "request_type": "transfer",
+        "effective_date": "2026-06-30",
+        "reason": "Family relocation",
+        "destination_school": "Destination School",
+    })
+    assert request.status_code == 201, request.text
+    case_id = request.json()["id"]
+    for action in ("submit", "approve", "complete"):
+        response = await client.post(
+            f"/api/v1/student-lifecycle/{case_id}/{action}",
+            headers=admin,
+            json={} if action != "approve" else {"override_clearance": False},
+        )
+        assert response.status_code == 200, response.text
+    completed = response.json()
+    assert completed["status"] == "completed"
+    assert completed["certificate_no"].startswith("TC-")
+    assert completed["certificate"]["last_class"] == grade["name"]
+
+    student = await client.get(f"/api/v1/students/{student_id}", headers=admin)
+    assert student.json()["enrollment_status"] == "transferred"
+    assert student.json()["grade_id"] is None
+
+    reenroll = await client.post("/api/v1/student-lifecycle", headers=admin, json={
+        "student_id": student_id,
+        "request_type": "reenrollment",
+        "effective_date": "2026-07-01",
+        "reason": "Returned to the institution",
+        "target_grade_id": grade["id"],
+        "target_section_id": section["id"],
+    })
+    assert reenroll.status_code == 201, reenroll.text
+    reenroll_id = reenroll.json()["id"]
+    for action in ("submit", "approve", "complete"):
+        response = await client.post(
+            f"/api/v1/student-lifecycle/{reenroll_id}/{action}",
+            headers=admin,
+            json={} if action != "approve" else {"override_clearance": False},
+        )
+        assert response.status_code == 200, response.text
+    student = await client.get(f"/api/v1/students/{student_id}", headers=admin)
+    assert student.json()["enrollment_status"] == "enrolled"
+    assert student.json()["grade_id"] == grade["id"]
+    assert student.json()["section_id"] == section["id"]
+
+
+@pytest.mark.asyncio
 async def test_protected_without_token(client):
     r = await client.get("/api/v1/modules")
     assert r.status_code == 401
@@ -686,7 +752,7 @@ async def test_continuing_student_applies_from_internal_portal(client):
         f"/api/v1/admissions/applications/{application['id']}/enroll", headers=admin,
     )
     assert enrolled.status_code == 200, enrolled.text
-    students = (await client.get("/api/v1/students", headers=admin)).json()["items"]
+    students = (await client.get("/api/v1/students", headers=admin, params={"page_size": 100})).json()["items"]
     promoted = next(s for s in students if s["id"] == enrolled.json()["student_id"])
     assert promoted["grade_id"] == target_grade["id"]
 

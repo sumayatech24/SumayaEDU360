@@ -633,6 +633,119 @@ function FacilitiesView({ readonly = false }: { readonly?: boolean }) {
   );
 }
 
+// ---------------------------------------------------------------- Learning materials
+interface LearningMaterial {
+  id: string; title: string; resource_type: string; audience: string;
+  subject?: string | null; grade?: string | null; url?: string | null;
+  description?: string | null; shared_on?: string | null;
+}
+const RES_ICON: Record<string, string> = {
+  document: "📄", notes: "📝", video: "🎬", ebook: "📚", recording: "🎧", link: "🔗",
+};
+
+function LearningMaterialsView({ scope }: { scope: "student" | "teacher" }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ["learning-materials", scope],
+    queryFn: async () => (await api.get<LearningMaterial[]>(`/portal/${scope}/learning-materials`)).data,
+  });
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-slate-400">
+        {scope === "student"
+          ? "Material shared with everyone, and notes shared with your class. Updated automatically."
+          : "General material and staff-only resources shared with teachers."}
+      </p>
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        {data?.map((m) => (
+          <div key={m.id} className="card p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold">{RES_ICON[m.resource_type] || "📄"} {m.title}</div>
+                <div className="mt-1 text-xs capitalize text-slate-400">
+                  {m.resource_type}{m.subject ? ` · ${m.subject}` : ""}{m.grade ? ` · ${m.grade}` : ""}
+                </div>
+                {m.description && <p className="mt-2 text-xs text-slate-500">{m.description}</p>}
+              </div>
+              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${
+                m.audience === "general" ? "bg-sky-50 text-sky-700" : m.audience === "teachers" ? "bg-orange-50 text-orange-700" : "bg-emerald-50 text-emerald-700"
+              }`}>{m.audience}</span>
+            </div>
+            {m.url && (
+              <a href={m.url} target="_blank" rel="noreferrer"
+                className="mt-3 inline-block rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700">
+                Open material
+              </a>
+            )}
+          </div>
+        ))}
+        {isLoading && <div className="text-sm text-slate-400">Loading…</div>}
+        {!isLoading && (!data || data.length === 0) && (
+          <div className="card p-5 text-sm text-slate-400">No learning material shared yet.</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- Teacher: facility booking approvals
+interface FacilityBookingReq {
+  id: string; facility: string; requested_by: string; booking_date?: string | null;
+  slot?: string | null; purpose?: string | null; amount: string; payment_status: string; status: string;
+}
+function FacilityBookingApprovals() {
+  const qc = useQueryClient();
+  const [busy, setBusy] = useState("");
+  const { data, isLoading } = useQuery({
+    queryKey: ["teacher-facility-bookings"],
+    queryFn: async () => (await api.get<FacilityBookingReq[]>("/portal/teacher/facility-bookings")).data,
+  });
+  async function decide(id: string, decision: "approved" | "rejected" | "completed") {
+    setBusy(id + decision);
+    try {
+      await api.post(`/portal/teacher/facility-bookings/${id}/decision`, { decision });
+      await qc.invalidateQueries({ queryKey: ["teacher-facility-bookings"] });
+    } catch (e) { alert(apiError(e)); } finally { setBusy(""); }
+  }
+  return (
+    <div className="card overflow-hidden">
+      <div className="border-b border-slate-100 px-4 py-3">
+        <h2 className="text-sm font-semibold text-slate-600">Facility Booking Requests</h2>
+        <p className="text-xs text-slate-400">Requests for facilities you are the in-charge of.</p>
+      </div>
+      <table className="w-full text-sm">
+        <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+          <tr><th className="px-4 py-3">Facility</th><th className="px-4 py-3">Requested by</th><th className="px-4 py-3">Date / Slot</th><th className="px-4 py-3">Fee</th><th className="px-4 py-3">Status</th><th className="px-4 py-3" /></tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {data?.map((b) => (
+            <tr key={b.id} className="hover:bg-slate-50">
+              <td className="px-4 py-2.5">{b.facility}</td>
+              <td className="px-4 py-2.5">{b.requested_by}{b.purpose ? <div className="text-xs text-slate-400">{b.purpose}</div> : null}</td>
+              <td className="px-4 py-2.5">{b.booking_date || "—"}{b.slot ? ` · ${b.slot}` : ""}</td>
+              <td className="px-4 py-2.5">{inr(b.amount)} · <span className={b.payment_status === "paid" || b.payment_status === "waived" ? "text-emerald-600" : "text-amber-600"}>{b.payment_status}</span></td>
+              <td className="px-4 py-2.5"><span className="capitalize">{b.status}</span></td>
+              <td className="px-4 py-2.5 text-right">
+                {b.status === "requested" && (
+                  <span className="flex justify-end gap-1">
+                    <button className="btn-primary px-2 py-1 text-xs" disabled={busy === b.id + "approved"} onClick={() => void decide(b.id, "approved")}>Approve</button>
+                    <button className="btn-ghost border border-rose-200 px-2 py-1 text-xs text-rose-600" disabled={busy === b.id + "rejected"} onClick={() => void decide(b.id, "rejected")}>Reject</button>
+                  </span>
+                )}
+                {b.status === "approved" && (
+                  <button className="btn-ghost border border-slate-200 px-2 py-1 text-xs" disabled={busy === b.id + "completed"} onClick={() => void decide(b.id, "completed")}>Mark used</button>
+                )}
+              </td>
+            </tr>
+          ))}
+          {!isLoading && (!data || data.length === 0) && (
+            <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-400">No booking requests for your facilities.</td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- Student portal
 export function StudentPortal() {
   return (
@@ -642,6 +755,7 @@ export function StudentPortal() {
         { label: "My Dashboard", icon: "grid", to: "" },
         { label: "Homework", icon: "edit", to: "homework" },
         { label: "Timetable", icon: "table", to: "timetable" },
+        { label: "Learning", icon: "book", to: "learning" },
         { label: "Activities", icon: "activity", to: "activities" },
         { label: "Facilities", icon: "grid", to: "facilities" },
         { label: "Help Desk", icon: "shield", to: "helpdesk" },
@@ -653,6 +767,7 @@ export function StudentPortal() {
         <Route index element={<Student360View />} />
         <Route path="homework" element={<HomeworkList />} />
         <Route path="timetable" element={<TimetableView />} />
+        <Route path="learning" element={<LearningMaterialsView scope="student" />} />
         <Route path="activities" element={<ActivitiesView />} />
         <Route path="facilities" element={<FacilitiesView />} />
         <Route path="helpdesk" element={<ComplaintsPanel canRaise />} />
@@ -1797,8 +1912,10 @@ export function TeacherPortal() {
         { label: "Student Marks", icon: "trending-up", to: "marks" },
         { label: "Assign Homework", icon: "edit", to: "homework" },
         { label: "Grade Homework", icon: "check-square", to: "submissions" },
+        { label: "Resources", icon: "book", to: "resources" },
         { label: "Meetings", icon: "users", to: "meetings" },
         { label: "Complaints", icon: "shield", to: "complaints" },
+        { label: "Facility Bookings", icon: "calendar", to: "facility-bookings" },
         { label: "Marks Review", icon: "activity", to: "marks-review" },
       ]}
     >
@@ -1812,8 +1929,10 @@ export function TeacherPortal() {
         <Route path="marks" element={<TeacherMarks />} />
         <Route path="homework" element={<TeacherHomework />} />
         <Route path="submissions" element={<TeacherSubmissions />} />
+        <Route path="resources" element={<LearningMaterialsView scope="teacher" />} />
         <Route path="meetings" element={<MeetingsPanel canSchedule />} />
         <Route path="complaints" element={<ComplaintsPanel canManage />} />
+        <Route path="facility-bookings" element={<FacilityBookingApprovals />} />
         <Route path="marks-review" element={<TeacherMarksReview />} />
         <Route path="*" element={<Navigate to="" replace />} />
       </Routes>

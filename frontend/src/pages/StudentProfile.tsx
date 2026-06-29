@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api } from "../lib/api";
+import { api, apiError } from "../lib/api";
 import { DocumentUpload } from "../components/DocumentUpload";
 import { useBranding } from "../lib/branding";
 import { printMarksheet } from "../lib/print";
@@ -59,6 +60,116 @@ function Table({ cols, rows }: { cols: [string, string][]; rows: Record<string, 
         )}
       </tbody>
     </table>
+  );
+}
+
+function StudentLifecycle({ studentId, studentStatus }: { studentId: string; studentStatus: string }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState("");
+  const [form, setForm] = useState({
+    request_type: studentStatus === "enrolled" ? "transfer" : "reenrollment",
+    effective_date: new Date().toISOString().slice(0, 10),
+    reason: "",
+    destination_school: "",
+    target_grade_id: "",
+    target_section_id: "",
+  });
+  const { data: cases = [] } = useQuery({
+    queryKey: ["student-lifecycle", studentId],
+    queryFn: async () => (await api.get<any[]>("/student-lifecycle", { params: { student_id: studentId } })).data,
+  });
+  const { data: grades } = useQuery({
+    queryKey: ["grades", "lifecycle"],
+    queryFn: async () => (await api.get<any>("/grades", { params: { page_size: 100 } })).data,
+  });
+  const { data: sections } = useQuery({
+    queryKey: ["sections", "lifecycle"],
+    queryFn: async () => (await api.get<any>("/sections", { params: { page_size: 100 } })).data,
+  });
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["student-lifecycle", studentId] });
+    qc.invalidateQueries({ queryKey: ["student-profile", studentId] });
+  };
+  const create = useMutation({
+    mutationFn: async () => (await api.post("/student-lifecycle", {
+      ...form,
+      student_id: studentId,
+      destination_school: form.destination_school || null,
+      target_grade_id: form.target_grade_id || null,
+      target_section_id: form.target_section_id || null,
+    })).data,
+    onSuccess: () => { setOpen(false); setError(""); refresh(); },
+    onError: (e) => setError(apiError(e)),
+  });
+  const transition = useMutation({
+    mutationFn: async ({ id, action }: { id: string; action: string }) =>
+      (await api.post(`/student-lifecycle/${id}/${action}`, action === "approve" ? { override_clearance: false } : {})).data,
+    onSuccess: refresh,
+    onError: (e) => setError(apiError(e)),
+  });
+  const availableSections = (sections?.items ?? []).filter((s: any) =>
+    !form.target_grade_id || s.grade_id === form.target_grade_id
+  );
+
+  return (
+    <Section title="Transfer, Withdrawal & TC" count={cases.length}>
+      <div className="mb-3 flex items-center justify-between">
+        <p className="text-xs text-slate-500">Clearance-gated lifecycle with approval and certificate history.</p>
+        <button className="btn-primary text-xs" onClick={() => setOpen(true)}>New request</button>
+      </div>
+      {error && <div className="mb-3 rounded-lg bg-rose-50 p-2 text-xs text-rose-600">{error}</div>}
+      <div className="space-y-3">
+        {cases.map((c: any) => (
+          <div key={c.id} className="rounded-xl border border-slate-100 p-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <div className="text-sm font-semibold">{c.request_no} · <span className="capitalize">{c.request_type}</span></div>
+                <div className="text-xs text-slate-500">{c.reason} · effective {c.effective_date}</div>
+              </div>
+              <span className="badge bg-slate-100 capitalize text-slate-600">{c.status}</span>
+            </div>
+            {c.clearance && (
+              <div className={`mt-2 rounded-lg p-2 text-xs ${c.clearance.clear ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                {c.clearance.clear ? "All clearance checks passed." : c.clearance.blockers.join(" · ")}
+              </div>
+            )}
+            {c.certificate && (
+              <div className="mt-2 rounded-lg bg-indigo-50 p-2 text-xs text-indigo-700">
+                Transfer certificate {c.certificate_no} · Last class {c.certificate.last_class || "—"} · Issued {c.certificate.issued_on}
+              </div>
+            )}
+            <div className="mt-2 flex flex-wrap gap-2">
+              {c.status === "draft" && <button className="btn-ghost text-xs" onClick={() => transition.mutate({ id: c.id, action: "submit" })}>Submit for clearance</button>}
+              {c.status === "submitted" && <button className="btn-primary text-xs" onClick={() => transition.mutate({ id: c.id, action: "approve" })}>Approve</button>}
+              {c.status === "approved" && <button className="btn-primary text-xs" onClick={() => transition.mutate({ id: c.id, action: "complete" })}>Complete & issue TC</button>}
+              {["draft", "submitted"].includes(c.status) && <button className="btn-ghost text-xs text-rose-600" onClick={() => transition.mutate({ id: c.id, action: "cancel" })}>Cancel</button>}
+            </div>
+          </div>
+        ))}
+        {!cases.length && <p className="text-sm text-slate-400">No lifecycle requests.</p>}
+      </div>
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="card w-full max-w-lg p-5">
+            <div className="mb-4 flex items-center justify-between"><h3 className="font-semibold">New student lifecycle request</h3><button onClick={() => setOpen(false)}>✕</button></div>
+            <div className="space-y-3">
+              <label><span className="label">Request type</span><select className="input" value={form.request_type} onChange={(e) => setForm({ ...form, request_type: e.target.value })}>
+                {studentStatus === "enrolled" ? <><option value="transfer">Transfer with TC</option><option value="withdrawal">Withdrawal with TC</option></> : <option value="reenrollment">Re-enrollment</option>}
+              </select></label>
+              <label><span className="label">Effective date</span><input className="input" type="date" value={form.effective_date} onChange={(e) => setForm({ ...form, effective_date: e.target.value })} /></label>
+              <label><span className="label">Reason</span><textarea className="input min-h-20" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} /></label>
+              {form.request_type === "transfer" && <label><span className="label">Destination school</span><input className="input" value={form.destination_school} onChange={(e) => setForm({ ...form, destination_school: e.target.value })} /></label>}
+              {form.request_type === "reenrollment" && <div className="grid grid-cols-2 gap-3">
+                <label><span className="label">Target class</span><select className="input" value={form.target_grade_id} onChange={(e) => setForm({ ...form, target_grade_id: e.target.value, target_section_id: "" })}><option value="">Select</option>{(grades?.items ?? []).map((g: any) => <option key={g.id} value={g.id}>{g.name}</option>)}</select></label>
+                <label><span className="label">Target section</span><select className="input" value={form.target_section_id} onChange={(e) => setForm({ ...form, target_section_id: e.target.value })}><option value="">Select</option>{availableSections.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+              </div>}
+            </div>
+            <div className="mt-5 flex justify-end gap-2"><button className="btn-ghost" onClick={() => setOpen(false)}>Cancel</button><button className="btn-primary" disabled={create.isPending || form.reason.trim().length < 3 || (form.request_type === "reenrollment" && (!form.target_grade_id || !form.target_section_id))} onClick={() => create.mutate()}>{create.isPending ? "Creating…" : "Create draft"}</button></div>
+          </div>
+        </div>
+      )}
+    </Section>
   );
 }
 
@@ -186,6 +297,8 @@ export function StudentProfile() {
         <Section title="Documents">
           <DocumentUpload ownerType="student" ownerId={id} />
         </Section>
+
+        <StudentLifecycle studentId={id} studentStatus={s.status} />
 
         <Section title="Disciplinary Actions" count={data.discipline.length}>
           <Table

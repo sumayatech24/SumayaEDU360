@@ -5,7 +5,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import Date, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Boolean, Date, ForeignKey, Integer, JSON, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -64,3 +64,33 @@ class StudentRemark(BaseEntity, Base):
     is_visible_to_parent: Mapped[bool] = mapped_column(
         __import__("sqlalchemy").Boolean, default=True, nullable=False
     )
+
+
+class StudentLifecycleRequest(BaseEntity, Base):
+    """Guarded transfer, withdrawal, TC and re-enrollment case."""
+
+    __tablename__ = "student_lifecycle_request"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "request_no", name="uq_student_lifecycle_request_no"),
+        UniqueConstraint("tenant_id", "certificate_no", name="uq_student_lifecycle_certificate_no"),
+    )
+
+    student_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("student.id"), index=True)
+    request_no: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    request_type: Mapped[str] = mapped_column(String(24), nullable=False, index=True)
+    # transfer / withdrawal / reenrollment
+    request_status: Mapped[str] = mapped_column(String(24), default="draft", nullable=False, index=True)
+    # draft / submitted / approved / completed / rejected / cancelled
+    effective_date: Mapped[date] = mapped_column(Date, nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    destination_school: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    target_grade_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("grade.id"), nullable=True)
+    target_section_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("section.id"), nullable=True)
+    clearance_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    override_clearance: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    approval_remarks: Mapped[str | None] = mapped_column(Text, nullable=True)
+    approved_by: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
+    approved_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    completed_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    certificate_no: Mapped[str | None] = mapped_column(String(50), nullable=True, index=True)
+    certificate_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)

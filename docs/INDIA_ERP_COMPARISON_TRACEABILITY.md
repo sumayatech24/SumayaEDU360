@@ -21,7 +21,7 @@ Status values:
 | # | Category | Workbook feature | AI opportunity | Current state | Verified implementation evidence | Required next slice |
 |---:|---|---|---|---|---|---|
 | 1 | Admissions | Online admission & enquiry | AI lead scoring | E2E / AI missing | Public applicant registration, application, document/check verification, placement, decision, fee receipt, enrollment; `test_complete_new_admission_lifecycle` | Lead scoring, counselor prioritization, explainability and drift review |
-| 2 | Student | Student information system | Student insights | Partial | Typed Student/Guardian records, Student 360, portal scoping, academic/discipline/assets history | Transfer/withdrawal/TC, merge, consent/medical vault, insight review |
+| 2 | Student | Student information system | Student insights | Partial | Typed Student/Guardian records, Student 360, portal scoping, academic/discipline/assets history, guarded transfer/withdrawal/TC and re-enrollment lifecycle | Duplicate/merge, consent/medical vault, alumni lifecycle, insight review |
 | 3 | Academics | Attendance | Absence prediction | Partial | Bulk marking, methods, summaries, portal visibility | Session timetable linkage, correction approval, monthly lock, alerts, prediction |
 | 4 | Academics | Timetable | AI timetable optimization | Thin | Typed periods and timetable screen | Constraint engine, conflict detection, version/approval/publish, optimization |
 | 5 | Academics | Homework & assignments | Auto generation | Partial | Homework, submission and grading workflows | Rubrics, attachments, resubmission/late policy, bulk grading, generation |

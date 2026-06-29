@@ -496,14 +496,16 @@ DOMAIN_SPECS: list[EntitySpec] = [
     ),
     # ----------------------------------------------------------------- Digital Learning Repository
     EntitySpec(
-        content.LearningResource, "learning-resource", "Learning Resource", "digital_learning_repository",
+        content.LearningResource, "learning-resource", "Learning Material", "digital_learning_repository",
         kind="master", icon="book", search_fields=["title"],
         fields=[
             _f("title", "Title", required=True),
             _f("resource_type", "Type", "select", options_master="resource_type"),
+            _f("audience", "Audience", "select", options_master="resource_audience",
+               help_text="General = everyone; Students/Teachers limit visibility. Set Grade to scope to a class."),
             _f("subject_id", "Subject", "reference", reference_entity="subject"),
-            _f("grade_id", "Grade", "reference", reference_entity="grade"),
-            _f("url", "URL"),
+            _f("grade_id", "Class / Grade", "reference", reference_entity="grade"),
+            _f("url", "URL / Link"),
             _f("description", "Description", "text", list_visible=False),
         ],
     ),

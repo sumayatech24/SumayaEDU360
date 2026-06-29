@@ -62,6 +62,7 @@ from app.models import (
     Institution,
     Invoice,
     InvoiceLineItem,
+    LearningResource,
     MasterType,
     MasterValue,
     MenuItem,
@@ -307,6 +308,7 @@ MASTERS: dict[str, tuple[str, list[str]]] = {
     "announcement_status": ("Announcement Status", ["Draft", "Published", "Archived"]),
     "cms_page_type": ("CMS Page Type", ["Page", "News", "Event", "Blog"]),
     "resource_type": ("Resource Type", ["Document", "Video", "Ebook", "Notes", "Recording", "Link"]),
+    "resource_audience": ("Material Audience", ["General", "Students", "Teachers"]),
     "question_type": ("Question Type", ["MCQ", "Short", "Long", "True/False", "Fill in the Blank"]),
     "difficulty": ("Difficulty", ["Easy", "Medium", "Hard"]),
     "meeting_mode": ("Meeting Mode", ["In Person", "Online"]),
@@ -426,6 +428,8 @@ async def ensure_runtime_schema(db: AsyncSession) -> None:
         "ALTER TABLE activity_registration ADD COLUMN IF NOT EXISTS amount NUMERIC(10,2) NOT NULL DEFAULT 0",
         "ALTER TABLE activity_registration ADD COLUMN IF NOT EXISTS payment_status VARCHAR(20) NOT NULL DEFAULT 'unpaid'",
         "ALTER TABLE activity_registration ADD COLUMN IF NOT EXISTS paid_at DATE",
+        # Learning material audience classification.
+        "ALTER TABLE learning_resource ADD COLUMN IF NOT EXISTS audience VARCHAR(20) NOT NULL DEFAULT 'general'",
     ]
     for stmt in statements:
         await db.execute(text(stmt))
@@ -1026,13 +1030,41 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
                     "description": f"{name} — book a slot through the student portal.",
                 },
             )
+        # Learning materials, audience-classified and auto-distributed to dashboards.
+        _g0 = grades[0] if grades else None
+        _sub0 = subs[0] if subs else None
+        for title, rtype, audience, gid, sid, url, desc in [
+            ("School Calendar 2025-26", "document", "general", None, None,
+             "https://example.com/calendar.pdf", "Holidays, exams and events for the session — visible to everyone."),
+            ("Code of Conduct & Safety Guide", "document", "general", None, None,
+             "https://example.com/conduct.pdf", "General guidelines for all students and staff."),
+            (f"{_sub0.name if _sub0 else 'Subject'} — Chapter 1 Notes", "notes", "students",
+             _g0.id if _g0 else None, _sub0.id if _sub0 else None,
+             "https://example.com/ch1-notes.pdf", "Class notes shared with this class only."),
+            ("Foundational Numeracy Worksheets", "document", "students",
+             _g0.id if _g0 else None, None,
+             "https://example.com/worksheets.pdf", "Practice worksheets for this class."),
+            ("Lesson Delivery Handbook (Staff)", "document", "teachers", None, None,
+             "https://example.com/staff-handbook.pdf", "Teaching guidance — visible to staff only, not students."),
+        ]:
+            await get_or_create(
+                db, LearningResource, tenant_id=tid, title=title,
+                defaults={"resource_type": rtype, "audience": audience, "grade_id": gid,
+                          "subject_id": sid, "url": url, "description": desc},
+            )
         if exam:
+            # The full class roster (first student's section) so report cards and
+            # the published-marks views have a complete class to demonstrate.
+            roster = (await db.execute(select(Student).where(
+                Student.tenant_id == tid, Student.grade_id == first_student.grade_id,
+                Student.section_id == first_student.section_id, Student.is_deleted.is_(False),
+            ).order_by(Student.roll_no, Student.admission_no))).scalars().all()
+
+            def _letter(pct: float) -> str:
+                return ("A+" if pct >= 90 else "A" if pct >= 80 else "B+" if pct >= 70
+                        else "B" if pct >= 60 else "C" if pct >= 50 else "D" if pct >= 40 else "E")
+
             for j, sub in enumerate(subs):
-                await get_or_create(
-                    db, Marks, tenant_id=tid, exam_id=exam.id, student_id=first_student.id, subject_id=sub.id,
-                    defaults={"marks_obtained": Decimal(str(72 + j * 6)), "max_marks": Decimal("100"),
-                              "grade_letter": "B+"},
-                )
                 await get_or_create(
                     db, ExamSubject, tenant_id=tid, exam_id=exam.id, subject_id=sub.id,
                     grade_id=first_student.grade_id, section_id=first_student.section_id,
@@ -1046,6 +1078,13 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
                               "reviewed_at": datetime.now(timezone.utc), "published_at": datetime.now(timezone.utc),
                               "review_note": "Demo marks approved and published."},
                 )
+                for k, stu in enumerate(roster):
+                    score = 55 + ((k * 7 + j * 11) % 41)  # spread 55-95 deterministically
+                    await get_or_create(
+                        db, Marks, tenant_id=tid, exam_id=exam.id, student_id=stu.id, subject_id=sub.id,
+                        defaults={"marks_obtained": Decimal(str(score)), "max_marks": Decimal("100"),
+                                  "grade_letter": _letter(score)},
+                    )
 
         # Enrich the demo student's full profile
         first_student.admission_date = date(2023, 4, 1)

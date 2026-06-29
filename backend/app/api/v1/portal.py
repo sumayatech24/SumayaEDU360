@@ -23,7 +23,7 @@ from app.models.academic import AcademicYear, Grade, Section, Subject
 from app.models.academics_ops import CurriculumPlan, Homework, HomeworkSubmission, TimetablePeriod
 from app.models.attendance import Attendance
 from app.models.auth import User
-from app.models.content import PtmMeeting
+from app.models.content import LearningResource, PtmMeeting
 from app.models.engagement import Complaint
 from app.models.exams import Exam, ExamSubject, Marks, MarksBatch
 from app.models.operations import (
@@ -553,6 +553,105 @@ async def pay_facility_booking(
     await db.flush()
     await record_audit(db, action="facility_payment", entity="FacilityBooking", entity_id=booking.id, actor=user)
     return {"id": str(booking.id), "payment_status": booking.payment_status}
+
+
+# ----------------------------------------------------------------- Learning materials
+def _resource_dict(r: LearningResource, maps: dict) -> dict:
+    return {
+        "id": str(r.id), "title": r.title, "resource_type": r.resource_type,
+        "audience": r.audience, "subject": maps["subjects"].get(r.subject_id) if r.subject_id else None,
+        "grade": maps["grades"].get(r.grade_id) if r.grade_id else "All classes",
+        "url": r.url, "description": r.description,
+        "shared_on": r.created_at.isoformat() if r.created_at else None,
+    }
+
+
+@router.get("/student/learning-materials")
+async def student_learning_materials(
+    db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user)
+):
+    """Auto-scoped: general material for everyone + student material for the
+    learner's own class (grade). Teacher-only material is never shown."""
+    student_id = await _linked_student_id(db, user)
+    student = await db.get(Student, student_id)
+    tid = user.tenant_id
+    rows = (await db.execute(select(LearningResource).where(
+        LearningResource.tenant_id == tid, LearningResource.is_deleted.is_(False),
+        LearningResource.audience.in_(("general", "students")),
+        (LearningResource.grade_id.is_(None)) | (LearningResource.grade_id == student.grade_id),
+    ).order_by(LearningResource.created_at.desc()))).scalars().all()
+    maps = await _name_maps(db, tid)
+    return [_resource_dict(r, maps) for r in rows]
+
+
+@router.get("/teacher/learning-materials")
+async def teacher_learning_materials(
+    db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user)
+):
+    """Staff-facing: general material + teacher-only material across all classes."""
+    tid = user.tenant_id
+    rows = (await db.execute(select(LearningResource).where(
+        LearningResource.tenant_id == tid, LearningResource.is_deleted.is_(False),
+        LearningResource.audience.in_(("general", "teachers")),
+    ).order_by(LearningResource.created_at.desc()))).scalars().all()
+    maps = await _name_maps(db, tid)
+    return [_resource_dict(r, maps) for r in rows]
+
+
+# ----------------------------------------------------------------- Facility in-charge approvals
+class BookingDecisionIn(BaseModel):
+    decision: str  # approved / rejected / completed
+
+
+@router.get("/teacher/facility-bookings")
+async def teacher_facility_bookings(
+    db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user)
+):
+    """Booking requests for facilities this staff member is in-charge of."""
+    emp_id = await _linked_employee_id(db, user)
+    tid = user.tenant_id
+    my_facilities = {f.id: f.name for f in (await db.execute(select(Facility).where(
+        Facility.tenant_id == tid, Facility.in_charge_id == emp_id, Facility.is_deleted.is_(False)
+    ))).scalars().all()}
+    if not my_facilities:
+        return []
+    bookings = (await db.execute(select(FacilityBooking).where(
+        FacilityBooking.tenant_id == tid, FacilityBooking.facility_id.in_(my_facilities.keys()),
+        FacilityBooking.is_deleted.is_(False),
+    ).order_by(FacilityBooking.created_at.desc()))).scalars().all()
+    students = await _student_names_map(db, tid)
+    return [
+        {
+            "id": str(b.id), "facility": my_facilities.get(b.facility_id, "—"),
+            "requested_by": b.requested_by_name or students.get(b.student_id, "—"),
+            "booking_date": b.booking_date.isoformat() if b.booking_date else None,
+            "slot": b.slot, "purpose": b.purpose, "amount": str(b.amount),
+            "payment_status": b.payment_status, "status": b.booking_status,
+        }
+        for b in bookings
+    ]
+
+
+@router.post("/teacher/facility-bookings/{booking_id}/decision")
+async def teacher_decide_facility_booking(
+    booking_id: uuid.UUID, payload: BookingDecisionIn,
+    db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user),
+):
+    if payload.decision not in ("approved", "rejected", "completed"):
+        raise HTTPException(422, "decision must be approved, rejected or completed")
+    emp_id = await _linked_employee_id(db, user)
+    booking = await db.get(FacilityBooking, booking_id)
+    if not booking or booking.tenant_id != user.tenant_id or booking.is_deleted:
+        raise HTTPException(404, "Booking not found")
+    facility = await db.get(Facility, booking.facility_id)
+    if not facility or facility.in_charge_id != emp_id:
+        raise HTTPException(403, "You are not the in-charge of this facility")
+    booking.booking_status = payload.decision
+    booking.updated_by = user.id
+    await db.flush()
+    await record_audit(db, action=f"booking_{payload.decision}", entity="FacilityBooking",
+                       entity_id=booking.id, actor=user)
+    return {"id": str(booking.id), "status": booking.booking_status}
 
 
 @router.get("/teacher/dashboard")
@@ -1587,6 +1686,13 @@ async def _employee_names(db: AsyncSession, tid: uuid.UUID) -> dict:
         Employee.tenant_id == tid, Employee.is_deleted.is_(False)
     ))).scalars().all()
     return {e.id: f"{e.first_name} {e.last_name or ''}".strip() for e in rows}
+
+
+async def _student_names_map(db: AsyncSession, tid: uuid.UUID) -> dict:
+    rows = (await db.execute(select(Student).where(
+        Student.tenant_id == tid, Student.is_deleted.is_(False)
+    ))).scalars().all()
+    return {s.id: f"{s.first_name} {s.last_name or ''}".strip() for s in rows}
 
 
 def _plan_dict(p: CurriculumPlan, maps: dict, emp_names: dict) -> dict:

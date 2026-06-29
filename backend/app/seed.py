@@ -430,6 +430,12 @@ async def ensure_runtime_schema(db: AsyncSession) -> None:
         "ALTER TABLE activity_registration ADD COLUMN IF NOT EXISTS paid_at DATE",
         # Learning material audience classification.
         "ALTER TABLE learning_resource ADD COLUMN IF NOT EXISTS audience VARCHAR(20) NOT NULL DEFAULT 'general'",
+        # Employee pay-package fields for end-to-end payroll.
+        "ALTER TABLE employee ADD COLUMN IF NOT EXISTS annual_ctc NUMERIC(12,2)",
+        "ALTER TABLE employee ADD COLUMN IF NOT EXISTS salary_structure_id UUID",
+        "ALTER TABLE employee ADD COLUMN IF NOT EXISTS tax_regime VARCHAR(10) NOT NULL DEFAULT 'new'",
+        "ALTER TABLE employee ADD COLUMN IF NOT EXISTS bank_account_no VARCHAR(40)",
+        "ALTER TABLE employee ADD COLUMN IF NOT EXISTS bank_ifsc VARCHAR(20)",
     ]
     for stmt in statements:
         await db.execute(text(stmt))
@@ -1507,6 +1513,35 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
                 defaults={"basic": Decimal("45000"), "allowances": Decimal("5000"), "deductions": Decimal("2000"),
                           "net_pay": Decimal("48000"), "payroll_status": "paid"},
             )
+
+        # ---- Payroll: a salary structure for the year + pay packages per employee ----
+        from app.models import SalaryStructure
+        structure, _ = await get_or_create(
+            db, SalaryStructure, tenant_id=tid, name="Standard Staff Structure", financial_year="2025-26",
+            defaults={
+                "basic_percent": Decimal("40"),
+                "components": [
+                    {"code": "hra", "name": "House Rent Allowance", "kind": "earning", "method": "percent_basic", "value": 40},
+                    {"code": "conveyance", "name": "Conveyance Allowance", "kind": "earning", "method": "fixed", "value": 1600},
+                    {"code": "medical", "name": "Medical Allowance", "kind": "earning", "method": "fixed", "value": 1250},
+                    {"code": "pf", "name": "Provident Fund", "kind": "deduction", "method": "percent_basic", "value": 12},
+                    {"code": "pt", "name": "Professional Tax", "kind": "deduction", "method": "fixed", "value": 200},
+                ],
+                "is_active": True,
+            },
+        )
+        # Assign a pay package to every employee (CTC scaled by staff role).
+        ctc_by_role = {"management": Decimal("1800000"), "admin_staff": Decimal("420000"),
+                       "teacher": Decimal("780000"), "accountant": Decimal("660000"),
+                       "librarian": Decimal("540000")}
+        all_emps = (await db.execute(select(Employee).where(
+            Employee.tenant_id == tid, Employee.is_deleted.is_(False)).order_by(Employee.employee_no))).scalars().all()
+        for idx, emp in enumerate(all_emps, start=1):
+            emp.annual_ctc = ctc_by_role.get(emp.staff_role, Decimal("600000"))
+            emp.salary_structure_id = structure.id
+            emp.tax_regime = "new"
+            emp.bank_account_no = emp.bank_account_no or f"00112233{idx:04d}"
+            emp.bank_ifsc = emp.bank_ifsc or "HDFC0001234"
     roles = {
         c: (await db.execute(select(Role).where(Role.tenant_id == tid, Role.code == c))).scalars().first()
         for c in ("student", "parent", "teacher", "principal")

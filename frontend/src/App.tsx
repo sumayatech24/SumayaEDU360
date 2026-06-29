@@ -31,6 +31,7 @@ import { Masters } from "./pages/Masters";
 import { Meals } from "./pages/Meals";
 import { ModulePage } from "./pages/ModulePage";
 import { ParentPortal as ParentPortalAdmin } from "./pages/ParentPortal";
+import { Payroll } from "./pages/Payroll";
 import { ParentPortal, StudentPortal, TeacherPortal } from "./pages/Portals";
 import { PrincipalPortal } from "./pages/PrincipalPortal";
 import { PublicAdmission } from "./pages/PublicAdmission";
@@ -85,6 +86,7 @@ function AdminApp() {
         <Route path="/question-bank" element={<QuestionBank />} />
         <Route path="/promotion" element={<Promotion />} />
         <Route path="/engagement" element={<Engagement />} />
+        <Route path="/payroll" element={<Payroll />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/ai" element={<AIIntelligence />} />
         <Route path="/integrations" element={<Integrations />} />

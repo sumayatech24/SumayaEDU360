@@ -96,7 +96,14 @@ from app.models.operations import (  # noqa: F401
     MealPlan,
     StockMovement,
 )
-from app.models.hr import LeaveRequest, LeaveType, Payroll  # noqa: F401
+from app.models.hr import (  # noqa: F401
+    LeaveRequest,
+    LeaveType,
+    Payroll,
+    PayrollRun,
+    Payslip,
+    SalaryStructure,
+)
 from app.models.library import (  # noqa: F401
     BookIssue,
     LibraryAcquisitionRequest,
@@ -153,7 +160,7 @@ __all__ = [
     "TransportRoute", "Vehicle", "RouteStop", "StudentTransportAssignment",
     "HostelBlock", "HostelRoom", "HostelAllocation", "HostelBed",
     "HostelAttendance", "HostelVisitor", "HostelIncident",
-    "LeaveType", "LeaveRequest", "Payroll",
+    "LeaveType", "LeaveRequest", "Payroll", "PayrollRun", "Payslip", "SalaryStructure",
     "Homework", "HomeworkSubmission", "TimetablePeriod", "LessonPlan", "CurriculumPlan",
     "LedgerAccount", "Vendor", "Expense", "PurchaseOrder",
     "InventoryItem", "StockMovement", "AssetAssignment", "Activity", "ActivityRegistration",

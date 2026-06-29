@@ -215,20 +215,8 @@ DOMAIN_SPECS: list[EntitySpec] = [
             _f("request_status", "Status", "select", options_master="leave_status"),
         ],
     ),
-    EntitySpec(
-        hr.Payroll, "payroll", "Payroll", "employee_hrms",
-        kind="transaction", icon="credit-card", search_fields=[],
-        fields=[
-            _f("employee_id", "Employee", "reference", required=True, reference_entity="employee"),
-            _f("month", "Month", "number", required=True),
-            _f("year", "Year", "number", required=True),
-            _f("basic", "Basic", "decimal"),
-            _f("allowances", "Allowances", "decimal"),
-            _f("deductions", "Deductions", "decimal"),
-            _f("net_pay", "Net Pay", "decimal"),
-            _f("payroll_status", "Status"),
-        ],
-    ),
+    # NOTE: the old per-employee "payroll" CRUD entity is replaced by the
+    # end-to-end payroll module (salary structures + monthly runs) at /payroll/*.
     # ----------------------------------------------------------------- Homework & Assignments
     EntitySpec(
         academics_ops.Homework, "homework", "Homework", "homework_assignments",

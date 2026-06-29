@@ -88,6 +88,12 @@ class Employee(BaseEntity, Base):
     employment_type: Mapped[str] = mapped_column(String(32), default="full_time", nullable=False)
     salary: Mapped["Numeric"] = mapped_column(Numeric(12, 2), nullable=True)
     employment_status: Mapped[str] = mapped_column(String(32), default="active", nullable=False)
+    # Payroll pay-package: annual CTC, the applicable structure, tax regime and bank.
+    annual_ctc: Mapped["Numeric"] = mapped_column(Numeric(12, 2), nullable=True)
+    salary_structure_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
+    tax_regime: Mapped[str] = mapped_column(String(10), default="new", nullable=False)  # new / old
+    bank_account_no: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    bank_ifsc: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
 
 class Teacher(BaseEntity, Base):

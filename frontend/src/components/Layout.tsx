@@ -16,7 +16,7 @@ const GROUP_FOR: Record<string, string> = {
   "/exams": "Academics", "/promotion": "Academics", "/question-bank": "Academics",
   "/homework": "Academics", "/teacher-allocation": "Academics",
   "/students": "Students & Admissions", "/admissions": "Students & Admissions", "/attendance": "Students & Admissions",
-  "/employees": "Staff & HR", "/hr": "Staff & HR",
+  "/employees": "Staff & HR", "/hr": "Staff & HR", "/payroll": "Staff & HR",
   "/engagement": "Engagement & Communication", "/communication": "Engagement & Communication",
   "/parent-portal": "Engagement & Communication", "/cms": "Engagement & Communication",
   "/knowledge": "Engagement & Communication", "/activities": "Engagement & Communication",
@@ -48,6 +48,9 @@ export function Layout() {
   const items: MenuItem[] = [...menu];
   if (!items.some((m) => m.path === "/engagement")) {
     items.push({ id: "static-engagement", path: "/engagement", icon: "users", label: "Family Engagement", sort_order: 0 });
+  }
+  if (!items.some((m) => m.path === "/payroll")) {
+    items.push({ id: "static-payroll", path: "/payroll", icon: "credit-card", label: "Payroll", sort_order: 0 });
   }
   const grouped = new Map<string, MenuItem[]>();
   GROUP_ORDER.forEach((g) => grouped.set(g, []));

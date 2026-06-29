@@ -1426,6 +1426,34 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
                 },
             )
 
+            # A few more approved class-wise plans so the session view is rich.
+            extra_subjects = (await db.execute(select(Subject).where(
+                Subject.tenant_id == tid).order_by(Subject.name).limit(3))).scalars().all()
+            extra_classes = sections[:2] if len(sections) >= 2 else sections
+            for sec in extra_classes:
+                for sub in extra_subjects:
+                    if sec.id == sections[0].id and sub.id == _plan_subject.id:
+                        continue  # already created above
+                    await get_or_create(
+                        db, CurriculumPlan, tenant_id=tid, teacher_id=teacher_emp.id,
+                        term="Quarter 1", subject_id=sub.id, grade_id=sec.grade_id, section_id=sec.id,
+                        defaults={
+                            "title": f"{sub.name} — Quarter 1 Plan",
+                            "academic_year_id": ay.id,
+                            "reviewer_id": principal_emp.id if principal_emp else None,
+                            "objectives": f"Foundational {sub.name} outcomes for the quarter through activity-based learning.",
+                            "topics": [
+                                {"name": f"{sub.name} basics", "weeks": "Week 1-3", "hours": 10, "status": "done"},
+                                {"name": f"{sub.name} application", "weeks": "Week 4-8", "hours": 14, "status": "in_progress"},
+                            ],
+                            "completion_percent": 50,
+                            "plan_status": "approved",
+                            "submitted_at": datetime.now(timezone.utc),
+                            "reviewed_at": datetime.now(timezone.utc),
+                            "review_note": "Approved.",
+                        },
+                    )
+
         # A sample approved leave + payroll so the staff profile is populated
         from app.models import LeaveRequest, Payroll
 

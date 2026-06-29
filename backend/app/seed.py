@@ -54,6 +54,7 @@ from app.models import (
     MarksBatch,
     Activity,
     AssetAssignment,
+    Facility,
     InventoryItem,
     TransportRoute,
     TimetablePeriod,
@@ -295,6 +296,11 @@ MASTERS: dict[str, tuple[str, list[str]]] = {
     "movement_type": ("Stock Movement Type", ["In", "Out"]),
     "activity_type": ("Activity Type", ["Club", "Sport", "Competition", "Camp", "Cultural"]),
     "registration_status": ("Registration Status", ["Registered", "Cancelled", "Attended"]),
+    "activity_status": ("Activity Status", ["Open", "Closed", "Full"]),
+    "facility_type": ("Facility Type", ["Ground", "Court", "Lab", "Auditorium", "Pool", "Hall", "Library"]),
+    "facility_status": ("Facility Status", ["Available", "Maintenance", "Closed"]),
+    "reg_payment_status": ("Payment Status", ["Unpaid", "Paid", "Waived"]),
+    "booking_status": ("Booking Status", ["Requested", "Approved", "Rejected", "Completed", "Cancelled"]),
     "meal_type": ("Meal Type", ["Breakfast", "Lunch", "Snacks", "Dinner"]),
     "audience": ("Audience", ["All", "Students", "Parents", "Teachers", "Staff"]),
     "comm_channel": ("Communication Channel", ["In App", "Email", "SMS", "WhatsApp", "Push"]),
@@ -412,6 +418,14 @@ async def ensure_runtime_schema(db: AsyncSession) -> None:
         "ALTER TABLE ptm_meeting ADD COLUMN IF NOT EXISTS action_items JSON",
         "ALTER TABLE ptm_meeting ADD COLUMN IF NOT EXISTS follow_up_date DATE",
         "ALTER TABLE ptm_meeting ADD COLUMN IF NOT EXISTS parent_ack BOOLEAN NOT NULL DEFAULT FALSE",
+        # Activities / sports — in-charge assignment + registration payment.
+        "ALTER TABLE activity ADD COLUMN IF NOT EXISTS in_charge_id UUID",
+        "ALTER TABLE activity ADD COLUMN IF NOT EXISTS venue VARCHAR(150)",
+        "ALTER TABLE activity ADD COLUMN IF NOT EXISTS schedule VARCHAR(150)",
+        "ALTER TABLE activity ADD COLUMN IF NOT EXISTS activity_status VARCHAR(20) NOT NULL DEFAULT 'open'",
+        "ALTER TABLE activity_registration ADD COLUMN IF NOT EXISTS amount NUMERIC(10,2) NOT NULL DEFAULT 0",
+        "ALTER TABLE activity_registration ADD COLUMN IF NOT EXISTS payment_status VARCHAR(20) NOT NULL DEFAULT 'unpaid'",
+        "ALTER TABLE activity_registration ADD COLUMN IF NOT EXISTS paid_at DATE",
     ]
     for stmt in statements:
         await db.execute(text(stmt))
@@ -971,10 +985,14 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
                         "submission_status": "submitted",
                     },
                 )
-        for code, name, kind, fee, cap in [
-            ("ACT-ROB", "Robotics Club", "club", Decimal("2500"), 30),
-            ("ACT-FOOT", "Inter-house Football", "sport", Decimal("0"), 22),
-            ("ACT-MUN", "Model United Nations", "competition", Decimal("1500"), 40),
+        activity_in_charge = (await db.execute(select(Employee).where(
+            Employee.tenant_id == tid, Employee.designation.ilike("%teacher%")
+        ).order_by(Employee.employee_no))).scalars().first()
+        for code, name, kind, fee, cap, venue, sched in [
+            ("ACT-ROB", "Robotics Club", "club", Decimal("2500"), 30, "Computer Lab", "Tue & Thu 3-4 PM"),
+            ("ACT-FOOT", "Inter-house Football", "sport", Decimal("0"), 22, "Main Ground", "Mon, Wed, Fri 4-5 PM"),
+            ("ACT-MUN", "Model United Nations", "competition", Decimal("1500"), 40, "Auditorium", "Sat 10-1 PM"),
+            ("ACT-SWIM", "Swimming Coaching", "sport", Decimal("3000"), 20, "Swimming Pool", "Mon & Wed 7-8 AM"),
         ]:
             await get_or_create(
                 db, Activity, tenant_id=tid, code=code,
@@ -982,9 +1000,30 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
                     "name": name,
                     "activity_type": kind,
                     "coordinator": "Rahul Verma",
+                    "in_charge_id": activity_in_charge.id if activity_in_charge else None,
+                    "venue": venue,
+                    "schedule": sched,
                     "start_date": date(2026, 8, 1),
                     "fee": fee,
                     "capacity": cap,
+                    "activity_status": "open",
+                },
+            )
+        # Bookable facilities with a staff in-charge.
+        for code, name, ftype, loc, cap, ufee in [
+            ("FAC-GND", "Main Sports Ground", "ground", "North Block", 200, Decimal("0")),
+            ("FAC-POOL", "Swimming Pool", "pool", "Sports Complex", 30, Decimal("200")),
+            ("FAC-AUD", "Auditorium", "auditorium", "Central Block", 400, Decimal("500")),
+            ("FAC-CRT", "Basketball Court", "court", "East Block", 20, Decimal("100")),
+        ]:
+            await get_or_create(
+                db, Facility, tenant_id=tid, code=code,
+                defaults={
+                    "name": name, "facility_type": ftype,
+                    "in_charge_id": activity_in_charge.id if activity_in_charge else None,
+                    "location": loc, "capacity": cap, "usage_fee": ufee,
+                    "facility_status": "available",
+                    "description": f"{name} — book a slot through the student portal.",
                 },
             )
         if exam:

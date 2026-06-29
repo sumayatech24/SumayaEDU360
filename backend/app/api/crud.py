@@ -79,8 +79,13 @@ def build_crud_router(
         base = select(model).where(*conditions)
         total = (await db.execute(select(func.count()).select_from(base.subquery()))).scalar_one()
         order_col = getattr(model, default_order, None)
+        # Always tie-break on the primary key so pagination is deterministic even
+        # when many rows share the same created_at (common right after seeding).
+        id_col = getattr(model, "id", None)
         if order_col is not None:
-            base = base.order_by(order_col.desc())
+            base = base.order_by(order_col.desc(), *( [id_col.desc()] if id_col is not None else [] ))
+        elif id_col is not None:
+            base = base.order_by(id_col.desc())
         rows = (await db.execute(base.offset((page - 1) * page_size).limit(page_size))).scalars().all()
         items = [out_schema.model_validate(r) for r in rows]
         return Page.build(items, total, page, page_size)

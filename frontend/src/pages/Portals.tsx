@@ -91,11 +91,38 @@ interface ActivityItem {
   name: string;
   activity_type?: string;
   coordinator?: string;
+  in_charge?: string | null;
+  venue?: string | null;
+  schedule?: string | null;
   start_date?: string;
   fee: string;
   capacity: number;
   registered_count: number;
   registered: boolean;
+  payment_status?: string | null;
+}
+
+interface FacilityItem {
+  id: string;
+  name: string;
+  code: string;
+  facility_type?: string | null;
+  in_charge?: string | null;
+  location?: string | null;
+  capacity: number;
+  usage_fee: string;
+  status: string;
+  description?: string | null;
+}
+interface FacilityBookingItem {
+  id: string;
+  facility: string;
+  booking_date?: string | null;
+  slot?: string | null;
+  purpose?: string | null;
+  amount: string;
+  payment_status: string;
+  status: string;
 }
 
 function useStudentDash() {
@@ -462,46 +489,145 @@ function ActivitiesView({ readonly = false }: { readonly?: boolean }) {
     queryKey: ["portal-activities"],
     queryFn: async () => (await api.get<ActivityItem[]>("/portal/student/activities")).data,
   });
+  const [busy, setBusy] = useState("");
 
-  async function register(id: string) {
-    await api.post(`/portal/student/activities/${id}/register`);
-    await query.refetch();
+  async function act(id: string, path: "register" | "pay") {
+    setBusy(id + path);
+    try {
+      await api.post(`/portal/student/activities/${id}/${path}`);
+      await query.refetch();
+    } catch (e) { alert(apiError(e)); } finally { setBusy(""); }
   }
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      {query.data?.map((a) => (
-        <div key={a.id} className="card p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="text-sm font-semibold">{a.name}</div>
-              <div className="text-xs capitalize text-slate-400">
-                {a.activity_type || "activity"} · {a.start_date || "date TBD"}
+      {query.data?.map((a) => {
+        const paid = a.payment_status === "paid" || a.payment_status === "waived";
+        const needsPay = a.registered && a.payment_status === "unpaid";
+        return (
+          <div key={a.id} className="card p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-sm font-semibold">{a.name}</div>
+                <div className="text-xs capitalize text-slate-400">
+                  {a.activity_type || "activity"} · {a.start_date || "date TBD"}
+                </div>
+                <div className="mt-2 space-y-0.5 text-xs text-slate-500">
+                  <div>In-charge {a.in_charge || a.coordinator || "--"}{a.venue ? ` · ${a.venue}` : ""}</div>
+                  {a.schedule && <div>Schedule: {a.schedule}</div>}
+                  <div>{a.registered_count}/{a.capacity || "open"} enrolled · Fee {inr(a.fee)}</div>
+                </div>
               </div>
-              <div className="mt-2 text-xs text-slate-500">
-                Coordinator {a.coordinator || "--"} · {a.registered_count}/{a.capacity || "open"} enrolled · {inr(a.fee)}
-              </div>
+              <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                a.registered ? (paid ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700") : "bg-slate-100 text-slate-500"
+              }`}>
+                {a.registered ? (paid ? "Registered" : "Payment due") : "Open"}
+              </span>
             </div>
-            <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-              a.registered ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"
-            }`}>
-              {a.registered ? "Registered" : "Open"}
-            </span>
+            {!readonly && (
+              <div className="mt-4 flex gap-2">
+                {!a.registered && (
+                  <button type="button" disabled={busy === a.id + "register"} onClick={() => void act(a.id, "register")}
+                    className="rounded-lg bg-brand-600 px-3 py-2 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50">Register</button>
+                )}
+                {needsPay && (
+                  <button type="button" disabled={busy === a.id + "pay"} onClick={() => void act(a.id, "pay")}
+                    className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50">Pay {inr(a.fee)}</button>
+                )}
+                {a.registered && paid && <span className="self-center text-xs text-emerald-600">✓ {a.payment_status === "waived" ? "No fee" : "Paid"}</span>}
+              </div>
+            )}
           </div>
-          {!readonly && !a.registered && (
-            <button
-              type="button"
-              onClick={() => void register(a.id)}
-              className="mt-4 rounded-lg bg-brand-600 px-3 py-2 text-xs font-medium text-white hover:bg-brand-700"
-            >
-              Register
-            </button>
-          )}
-        </div>
-      ))}
+        );
+      })}
       {query.isLoading && <div className="text-sm text-slate-400">Loading...</div>}
       {!query.isLoading && (!query.data || query.data.length === 0) && (
         <div className="card p-5 text-sm text-slate-400">No activities open.</div>
+      )}
+    </div>
+  );
+}
+
+function FacilitiesView({ readonly = false }: { readonly?: boolean }) {
+  const qc = useQueryClient();
+  const { data } = useQuery({
+    queryKey: ["portal-facilities"],
+    queryFn: async () => (await api.get<{ facilities: FacilityItem[]; bookings: FacilityBookingItem[] }>("/portal/student/facilities")).data,
+  });
+  const [form, setForm] = useState<Record<string, { date: string; slot: string; purpose: string }>>({});
+  const [busy, setBusy] = useState("");
+  const refresh = () => qc.invalidateQueries({ queryKey: ["portal-facilities"] });
+  const setF = (id: string, patch: Partial<{ date: string; slot: string; purpose: string }>) =>
+    setForm((f) => {
+      const cur = f[id] ?? { date: "", slot: "", purpose: "" };
+      return { ...f, [id]: { ...cur, ...patch } };
+    });
+
+  async function book(id: string) {
+    const f = form[id] || { date: "", slot: "", purpose: "" };
+    setBusy(id);
+    try {
+      await api.post(`/portal/student/facilities/${id}/book`, { booking_date: f.date || null, slot: f.slot || null, purpose: f.purpose || null });
+      setForm((s) => ({ ...s, [id]: { date: "", slot: "", purpose: "" } }));
+      refresh();
+    } catch (e) { alert(apiError(e)); } finally { setBusy(""); }
+  }
+  async function pay(bookingId: string) {
+    setBusy(bookingId);
+    try { await api.post(`/portal/student/facility-bookings/${bookingId}/pay`); refresh(); }
+    catch (e) { alert(apiError(e)); } finally { setBusy(""); }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {data?.facilities.map((fac) => {
+          const f = form[fac.id] || { date: "", slot: "", purpose: "" };
+          return (
+            <div key={fac.id} className="card p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold">{fac.name}</div>
+                  <div className="text-xs capitalize text-slate-400">{fac.facility_type || "facility"}{fac.location ? ` · ${fac.location}` : ""}</div>
+                  <div className="mt-1 text-xs text-slate-500">In-charge {fac.in_charge || "--"} · Capacity {fac.capacity || "—"} · Fee {inr(fac.usage_fee)}</div>
+                </div>
+                <span className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${fac.status === "available" ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{fac.status}</span>
+              </div>
+              {!readonly && fac.status === "available" && (
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <input className="input h-9 text-xs" type="date" value={f.date} onChange={(e) => setF(fac.id, { date: e.target.value })} />
+                  <input className="input h-9 text-xs" placeholder="Slot e.g. 4-5 PM" value={f.slot} onChange={(e) => setF(fac.id, { slot: e.target.value })} />
+                  <input className="input h-9 text-xs" placeholder="Purpose" value={f.purpose} onChange={(e) => setF(fac.id, { purpose: e.target.value })} />
+                  <button className="btn-primary col-span-3 py-1.5 text-xs" disabled={busy === fac.id} onClick={() => void book(fac.id)}>Request booking</button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {(!data || data.facilities.length === 0) && <div className="card p-5 text-sm text-slate-400">No facilities listed.</div>}
+      </div>
+
+      {data && data.bookings.length > 0 && (
+        <div className="card overflow-hidden">
+          <div className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-600">My Bookings</div>
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+              <tr><th className="px-4 py-3">Facility</th><th className="px-4 py-3">Date</th><th className="px-4 py-3">Slot</th><th className="px-4 py-3">Fee</th><th className="px-4 py-3">Status</th><th className="px-4 py-3" /></tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {data.bookings.map((b) => (
+                <tr key={b.id}>
+                  <td className="px-4 py-2.5">{b.facility}</td>
+                  <td className="px-4 py-2.5">{b.booking_date || "—"}</td>
+                  <td className="px-4 py-2.5">{b.slot || "—"}</td>
+                  <td className="px-4 py-2.5">{inr(b.amount)}</td>
+                  <td className="px-4 py-2.5"><span className="capitalize">{b.status}</span> · <span className={b.payment_status === "paid" || b.payment_status === "waived" ? "text-emerald-600" : "text-amber-600"}>{b.payment_status}</span></td>
+                  <td className="px-4 py-2.5 text-right">{!readonly && b.payment_status === "unpaid" && <button className="btn-primary px-2.5 py-1 text-xs" disabled={busy === b.id} onClick={() => void pay(b.id)}>Pay {inr(b.amount)}</button>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
@@ -517,6 +643,7 @@ export function StudentPortal() {
         { label: "Homework", icon: "edit", to: "homework" },
         { label: "Timetable", icon: "table", to: "timetable" },
         { label: "Activities", icon: "activity", to: "activities" },
+        { label: "Facilities", icon: "grid", to: "facilities" },
         { label: "Help Desk", icon: "shield", to: "helpdesk" },
         { label: "Next Admission", icon: "school", to: "admission" },
         { label: "Profile", icon: "users", to: "profile" },
@@ -527,6 +654,7 @@ export function StudentPortal() {
         <Route path="homework" element={<HomeworkList />} />
         <Route path="timetable" element={<TimetableView />} />
         <Route path="activities" element={<ActivitiesView />} />
+        <Route path="facilities" element={<FacilitiesView />} />
         <Route path="helpdesk" element={<ComplaintsPanel canRaise />} />
         <Route path="admission" element={<ContinuingAdmission />} />
         <Route path="profile" element={<GuardiansResults />} />

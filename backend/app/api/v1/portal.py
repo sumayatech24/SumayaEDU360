@@ -26,7 +26,9 @@ from app.models.auth import User
 from app.models.content import PtmMeeting
 from app.models.engagement import Complaint
 from app.models.exams import Exam, ExamSubject, Marks, MarksBatch
-from app.models.operations import Activity, ActivityRegistration, Announcement
+from app.models.operations import (
+    Activity, ActivityRegistration, Announcement, Facility, FacilityBooking,
+)
 from app.models.people import Employee, Student, TeacherAssignment, TeacherProfile
 
 router = APIRouter(prefix="/portal", tags=["Portals"])
@@ -367,6 +369,7 @@ async def student_activities(
         ActivityRegistration.registration_status == "registered",
         ActivityRegistration.is_deleted.is_(False),
     ).group_by(ActivityRegistration.activity_id))).all())
+    emp_names = await _employee_names(db, user.tenant_id)
     return [
         {
             "id": str(a.id),
@@ -374,11 +377,15 @@ async def student_activities(
             "code": a.code,
             "activity_type": a.activity_type,
             "coordinator": a.coordinator,
+            "in_charge": emp_names.get(a.in_charge_id) if a.in_charge_id else a.coordinator,
+            "venue": a.venue,
+            "schedule": a.schedule,
             "start_date": a.start_date.isoformat() if a.start_date else None,
             "fee": str(a.fee),
             "capacity": a.capacity,
             "registered_count": counts.get(a.id, 0),
             "registered": a.id in registered,
+            "payment_status": registered[a.id].payment_status if a.id in registered else None,
         }
         for a in activities
     ]
@@ -410,21 +417,142 @@ async def self_register_activity(
     ))).scalar_one()
     if activity.capacity and count >= activity.capacity:
         raise HTTPException(409, "Activity is full")
+    pay_status = "unpaid" if activity.fee and activity.fee > 0 else "waived"
     if existing:
         existing.registration_status = "registered"
         existing.registration_date = date.today()
+        existing.amount = activity.fee
+        if existing.payment_status not in ("paid", "waived"):
+            existing.payment_status = pay_status
         existing.updated_by = user.id
         reg = existing
     else:
         reg = ActivityRegistration(
             tenant_id=user.tenant_id, activity_id=activity.id, student_id=student_id,
             registration_date=date.today(), registration_status="registered",
+            amount=activity.fee, payment_status=pay_status,
             created_by=user.id, updated_by=user.id,
         )
         db.add(reg)
     await db.flush()
     await record_audit(db, action="self_register", entity="ActivityRegistration", entity_id=reg.id, actor=user)
-    return {"id": str(reg.id), "status": reg.registration_status}
+    return {"id": str(reg.id), "status": reg.registration_status, "payment_status": reg.payment_status}
+
+
+@router.post("/student/activities/{activity_id}/pay")
+async def pay_activity(
+    activity_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    """Record an activity fee payment (demo gateway — marks the registration paid)."""
+    student_id = await _linked_student_id(db, user)
+    reg = (await db.execute(select(ActivityRegistration).where(
+        ActivityRegistration.tenant_id == user.tenant_id,
+        ActivityRegistration.activity_id == activity_id,
+        ActivityRegistration.student_id == student_id,
+        ActivityRegistration.is_deleted.is_(False),
+    ))).scalars().first()
+    if not reg or reg.registration_status != "registered":
+        raise HTTPException(404, "Register for the activity before paying")
+    if reg.payment_status == "paid":
+        return {"id": str(reg.id), "payment_status": "paid"}
+    reg.payment_status = "paid"
+    reg.paid_at = date.today()
+    reg.updated_by = user.id
+    await db.flush()
+    await record_audit(db, action="activity_payment", entity="ActivityRegistration", entity_id=reg.id, actor=user)
+    return {"id": str(reg.id), "payment_status": reg.payment_status}
+
+
+# ----------------------------------------------------------------- Facilities (browse / book / pay)
+@router.get("/student/facilities")
+async def student_facilities(
+    db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user)
+):
+    student_id = await _linked_student_id(db, user)
+    facilities = (await db.execute(select(Facility).where(
+        Facility.tenant_id == user.tenant_id, Facility.is_deleted.is_(False)
+    ).order_by(Facility.name))).scalars().all()
+    bookings = (await db.execute(select(FacilityBooking).where(
+        FacilityBooking.tenant_id == user.tenant_id,
+        FacilityBooking.student_id == student_id,
+        FacilityBooking.is_deleted.is_(False),
+    ).order_by(FacilityBooking.created_at.desc()))).scalars().all()
+    emp_names = await _employee_names(db, user.tenant_id)
+    fac_names = {f.id: f.name for f in facilities}
+    return {
+        "facilities": [
+            {
+                "id": str(f.id), "name": f.name, "code": f.code, "facility_type": f.facility_type,
+                "in_charge": emp_names.get(f.in_charge_id) if f.in_charge_id else None,
+                "location": f.location, "capacity": f.capacity, "usage_fee": str(f.usage_fee),
+                "status": f.facility_status, "description": f.description,
+            }
+            for f in facilities
+        ],
+        "bookings": [
+            {
+                "id": str(b.id), "facility": fac_names.get(b.facility_id, "—"),
+                "booking_date": b.booking_date.isoformat() if b.booking_date else None,
+                "slot": b.slot, "purpose": b.purpose, "amount": str(b.amount),
+                "payment_status": b.payment_status, "status": b.booking_status,
+            }
+            for b in bookings
+        ],
+    }
+
+
+class FacilityBookIn(BaseModel):
+    booking_date: date | None = None
+    slot: str | None = None
+    purpose: str | None = None
+
+
+@router.post("/student/facilities/{facility_id}/book")
+async def book_facility(
+    facility_id: uuid.UUID,
+    payload: FacilityBookIn,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    student_id = await _linked_student_id(db, user)
+    facility = await db.get(Facility, facility_id)
+    if not facility or facility.tenant_id != user.tenant_id or facility.is_deleted:
+        raise HTTPException(404, "Facility not found")
+    if facility.facility_status != "available":
+        raise HTTPException(409, "Facility is not available for booking")
+    booking = FacilityBooking(
+        tenant_id=user.tenant_id, facility_id=facility.id, student_id=student_id,
+        requested_by=user.id, requested_by_name=user.full_name,
+        booking_date=payload.booking_date, slot=payload.slot, purpose=payload.purpose,
+        amount=facility.usage_fee,
+        payment_status="unpaid" if facility.usage_fee and facility.usage_fee > 0 else "waived",
+        booking_status="requested", created_by=user.id, updated_by=user.id,
+    )
+    db.add(booking)
+    await db.flush()
+    await record_audit(db, action="facility_book", entity="FacilityBooking", entity_id=booking.id, actor=user)
+    return {"id": str(booking.id), "status": booking.booking_status, "payment_status": booking.payment_status}
+
+
+@router.post("/student/facility-bookings/{booking_id}/pay")
+async def pay_facility_booking(
+    booking_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    student_id = await _linked_student_id(db, user)
+    booking = await db.get(FacilityBooking, booking_id)
+    if not booking or booking.tenant_id != user.tenant_id or booking.student_id != student_id or booking.is_deleted:
+        raise HTTPException(404, "Booking not found")
+    if booking.payment_status == "paid":
+        return {"id": str(booking.id), "payment_status": "paid"}
+    booking.payment_status = "paid"
+    booking.updated_by = user.id
+    await db.flush()
+    await record_audit(db, action="facility_payment", entity="FacilityBooking", entity_id=booking.id, actor=user)
+    return {"id": str(booking.id), "payment_status": booking.payment_status}
 
 
 @router.get("/teacher/dashboard")

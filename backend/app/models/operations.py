@@ -63,9 +63,14 @@ class Activity(BaseEntity, Base):
     code: Mapped[str] = mapped_column(String(40), nullable=False)
     activity_type: Mapped[str | None] = mapped_column(String(50), nullable=True)  # club/sport/competition
     coordinator: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    # Teacher/staff member responsible for running the activity.
+    in_charge_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("employee.id"), nullable=True, index=True)
+    venue: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    schedule: Mapped[str | None] = mapped_column(String(150), nullable=True)  # e.g. "Mon & Wed 3-4 PM"
     start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     fee: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0, nullable=False)
     capacity: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    activity_status: Mapped[str] = mapped_column(String(20), default="open", nullable=False)  # open/closed/full
 
 
 class ActivityRegistration(BaseEntity, Base):
@@ -76,6 +81,41 @@ class ActivityRegistration(BaseEntity, Base):
     registration_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     registration_status: Mapped[str] = mapped_column(String(20), default="registered", nullable=False)
     # registered / cancelled / attended
+    amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0, nullable=False)
+    payment_status: Mapped[str] = mapped_column(String(20), default="unpaid", nullable=False)  # unpaid/paid/waived
+    paid_at: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+
+class Facility(BaseEntity, Base):
+    """A bookable school facility (sports ground, lab, auditorium, court, pool…)."""
+
+    __tablename__ = "facility"
+
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    code: Mapped[str] = mapped_column(String(40), nullable=False)
+    facility_type: Mapped[str | None] = mapped_column(String(50), nullable=True)  # ground/court/lab/auditorium/pool
+    in_charge_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("employee.id"), nullable=True, index=True)
+    location: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    capacity: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    usage_fee: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0, nullable=False)
+    facility_status: Mapped[str] = mapped_column(String(20), default="available", nullable=False)  # available/maintenance/closed
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class FacilityBooking(BaseEntity, Base):
+    __tablename__ = "facility_booking"
+
+    facility_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("facility.id"), index=True)
+    student_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("student.id"), nullable=True, index=True)
+    requested_by: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
+    requested_by_name: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    booking_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    slot: Mapped[str | None] = mapped_column(String(80), nullable=True)  # e.g. "4-5 PM"
+    purpose: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=0, nullable=False)
+    payment_status: Mapped[str] = mapped_column(String(20), default="unpaid", nullable=False)  # unpaid/paid/waived
+    booking_status: Mapped[str] = mapped_column(String(20), default="requested", nullable=False)
+    # requested / approved / rejected / completed / cancelled
 
 
 # --------------------------------------------------------------------- Meal & Cafeteria

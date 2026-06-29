@@ -17,6 +17,7 @@ from app.models.admissions import (  # noqa: F401
     AdmissionVerification,
 )
 from app.models.attendance import Attendance  # noqa: F401
+from app.models.ai import AIAssistantSession, AIAutomationRun, AIInsight, AIMessage  # noqa: F401
 from app.models.auth import (  # noqa: F401
     Permission,
     Role,
@@ -127,6 +128,7 @@ __all__ = [
     "AcademicYear", "Grade", "Program", "Section", "Semester", "Subject", "Topic",
     "AdmissionLead", "AdmissionApplicant", "AdmissionApplication", "AdmissionCharge",
     "AdmissionDocument", "AdmissionVerification", "Attendance",
+    "AIAssistantSession", "AIMessage", "AIInsight", "AIAutomationRun",
     "Permission", "Role", "RolePermission", "User", "UserRole",
     "Exam", "ExamSubject", "Marks", "MarksBatch", "QuestionPaper",
     "FeePlan", "FeePlanComponent", "FeeInstallment", "StudentFeeAccount",

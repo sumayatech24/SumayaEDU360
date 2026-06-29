@@ -46,7 +46,7 @@ four delivery states:
 | P3 | Dashboards & Analytics | Functional partial | KPI definitions, saved dashboards, drill-through, scheduled reports, data-quality monitoring. |
 | P3 | Security & Compliance | Functional partial | Approval policies, segregation of duties, session/device controls, retention/export, security events. |
 | P4 | Integrations | Not implemented | Current screen stores toggles only; provider credentials, webhooks, retries, logs, reconciliation and health checks are absent. |
-| P4 | AI Copilots | Not implemented | Retrieval, safe tools, prompt/config governance, evaluation, usage/cost controls and audit. |
+| P4 | AI Copilots | **Functional partial** | Governed role-scoped assistants, versioned/audited sessions, sensitive-data guardrails, explainable admission/absence/fee predictors, feedback/review, and approval-gated idempotent agent proposals are live. Next: external provider/RAG adapters, evaluation sets, cost budgets and write-tool rollback contracts. |
 | P4 | Mobile Apps | Not implemented | Native delivery remains separate; API/portal readiness alone is not a mobile app. |
 | P4 | Administration & Workflow | Not implemented | Generic metadata records only; needs workflow definitions, approval routing, inbox, SLA/escalation and history. |
 
@@ -80,7 +80,7 @@ Admissions rather than expanding all modules horizontally.
 | M023 | PTM & Communication | **Workflow** | Announcements (Publish) + PTM meeting slots/status |
 | M024 | Knowledge Base | **Workflow** | Bespoke screen: articles with Publish + digital library |
 | M025 | Dashboards & Analytics | **Workflow** | Live dashboard cards + **Reports subsystem (17 reports, CSV export)** |
-| M026 | AI Copilots | Metadata | Module registered; RAG/agents TBD |
+| M026 | AI Copilots | **Workflow** | Dedicated AI Intelligence workbench; teacher/parent/student/operations assistants; explainable risk register; human feedback/review; agent dry-run, idempotency and approval lifecycle. External LLM/RAG and business write tools remain disabled until configured. |
 | M027 | Mobile Apps | — | API-ready; native apps out of scope here |
 | M028 | Security & Compliance | **Workflow** | RBAC matrix, users/roles, immutable audit log |
 | M029 | Integrations | **Typed CRUD** | Bespoke screen: 10 channel toggles (WhatsApp/SMS/payment/SSO/...) |
@@ -120,7 +120,7 @@ Admissions rather than expanding all modules horizontally.
   library circulation, hostel occupancy, payroll, inventory, expense ledger, and more.
 - Bespoke screens added for Transport, Timetable, Curriculum, Question Bank, Meals,
   Knowledge/Digital Library, CMS (publish), **Parent Portal (Student-360)** and **Integrations**.
-- Net: ~27 of 30 modules now ship a dedicated screen; remaining (AI Copilots, Mobile,
+- Net: ~28 of 30 modules now ship a dedicated screen; remaining (Mobile and
   Administration generic) are future-phase by design.
 - Added separate student, parent and teacher portal shells selected after login, backed by
   `/portal/context`; student/parent users now see profile, fees, attendance, marks,

@@ -60,6 +60,7 @@ export function Login() {
           <div className="grid grid-cols-2 gap-2 text-xs">
             {[
               ["Admin", "admin@sumaya.edu", "Admin@123"],
+              ["Principal", "principal@sumaya.edu", "Principal@123"],
               ["Teacher", "teacher@sumaya.edu", "Teacher@123"],
               ["Student", "student@sumaya.edu", "Student@123"],
               ["Parent", "parent@sumaya.edu", "Parent@123"],

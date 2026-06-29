@@ -3,7 +3,7 @@ import { api, getToken, setToken } from "./api";
 import type { Me } from "./types";
 
 export interface PortalContext {
-  portal: "admin" | "student" | "parent" | "teacher";
+  portal: "admin" | "student" | "parent" | "teacher" | "principal";
   name: string;
   email: string;
   roles: string[];
@@ -26,6 +26,7 @@ export const PORTAL_BASE: Record<string, string> = {
   student: "/student",
   parent: "/parent",
   teacher: "/teacher",
+  principal: "/principal",
 };
 
 const Ctx = createContext<AuthCtx>(null!);

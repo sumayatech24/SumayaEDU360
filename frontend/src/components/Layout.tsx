@@ -23,7 +23,7 @@ const GROUP_FOR: Record<string, string> = {
   "/library": "Operations", "/hostel": "Operations", "/transport": "Operations",
   "/meals": "Operations", "/store": "Operations", "/asset-tracking": "Operations",
   "/fees": "Finance", "/finance": "Finance",
-  "/reports": "Insights",
+  "/reports": "Insights", "/ai": "Insights",
   "/masters": "Configuration", "/branding": "Configuration", "/customize-fields": "Configuration",
   "/users": "Configuration", "/audit": "Configuration", "/integrations": "Configuration",
 };

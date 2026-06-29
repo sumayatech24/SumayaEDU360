@@ -21,6 +21,14 @@ async def lifespan(app: FastAPI):
     if settings.INIT_DB_ON_STARTUP:
         try:
             await init_models()
+            # Keep existing PostgreSQL development/preview databases compatible with
+            # additive model changes. Production deployments should run the equivalent
+            # versioned migration before traffic is shifted.
+            from app.core.database import AsyncSessionLocal
+            from app.seed import ensure_runtime_schema
+            async with AsyncSessionLocal() as db:
+                await ensure_runtime_schema(db)
+                await db.commit()
             logger.info("Database tables ensured.")
         except Exception as exc:  # pragma: no cover - startup diagnostics
             logger.warning("Could not initialise tables on startup: %s", exc)

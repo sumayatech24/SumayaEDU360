@@ -34,7 +34,9 @@ OPEN_STATES = ("open", "assigned", "in_progress", "reopened")
 
 # --------------------------------------------------------------------------- helpers
 def _kind(user: CurrentUser) -> str:
-    return portal_for(user.roles, user.is_superadmin)
+    # Principal/vice-principal get the same full oversight as an administrator.
+    k = portal_for(user.roles, user.is_superadmin)
+    return "admin" if k == "principal" else k
 
 
 async def _db_user(db: AsyncSession, user: CurrentUser) -> User:

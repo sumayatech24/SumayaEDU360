@@ -3,6 +3,7 @@ import { Layout } from "./components/Layout";
 import { ResourcePage } from "./components/ResourcePage";
 import { PORTAL_BASE, useAuth } from "./lib/auth";
 import { Academic } from "./pages/Academic";
+import { AIIntelligence } from "./pages/AIIntelligence";
 import { ActivitiesPage } from "./pages/ActivitiesPage";
 import { Admissions } from "./pages/Admissions";
 import { Attendance } from "./pages/Attendance";
@@ -31,6 +32,7 @@ import { Meals } from "./pages/Meals";
 import { ModulePage } from "./pages/ModulePage";
 import { ParentPortal as ParentPortalAdmin } from "./pages/ParentPortal";
 import { ParentPortal, StudentPortal, TeacherPortal } from "./pages/Portals";
+import { PrincipalPortal } from "./pages/PrincipalPortal";
 import { PublicAdmission } from "./pages/PublicAdmission";
 import { Promotion } from "./pages/Promotion";
 import { PublicPage } from "./pages/public/PublicPage";
@@ -84,6 +86,7 @@ function AdminApp() {
         <Route path="/promotion" element={<Promotion />} />
         <Route path="/engagement" element={<Engagement />} />
         <Route path="/reports" element={<Reports />} />
+        <Route path="/ai" element={<AIIntelligence />} />
         <Route path="/integrations" element={<Integrations />} />
         <Route path="/masters" element={<Masters />} />
         <Route path="/branding" element={<Branding />} />
@@ -133,6 +136,7 @@ export default function App() {
       <Route path="/student/*" element={<Guard need="student"><StudentPortal /></Guard>} />
       <Route path="/parent/*" element={<Guard need="parent"><ParentPortal /></Guard>} />
       <Route path="/teacher/*" element={<Guard need="teacher"><TeacherPortal /></Guard>} />
+      <Route path="/principal/*" element={<Guard need="principal"><PrincipalPortal /></Guard>} />
       <Route path="/*" element={<Guard need="admin"><AdminApp /></Guard>} />
     </Routes>
   );

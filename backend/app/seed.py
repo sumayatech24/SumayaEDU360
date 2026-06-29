@@ -346,6 +346,7 @@ CORE_NAV = [
     ("Knowledge & Library", "book", "/knowledge", "knowledge_base", "knowledge_base:read", 31),
     ("Website & CMS", "grid", "/cms", "public_website_cms", "public_website_cms:read", 32),
     ("Reports", "activity", "/reports", "dashboards_analytics", "dashboards_analytics:read", 80),
+    ("AI Intelligence", "activity", "/ai", "ai_copilots", "ai_copilots:read", 81),
     ("Masters", "sliders", "/masters", "academic_configuration", "academic_configuration:read", 90),
     ("Customize Fields", "edit", "/customize-fields", "academic_configuration", "academic_configuration:read", 88),
     ("Branding", "grid", "/branding", "security_compliance", "security_compliance:read", 89),
@@ -693,7 +694,7 @@ async def seed() -> None:
             "digital_learning_repository", "fees_billing", "finance_accounting",
             "meal_cafeteria", "transport", "hostel", "activities_events",
             "ptm_communication", "knowledge_base", "dashboards_analytics",
-            "security_compliance", "integrations",
+            "security_compliance", "integrations", "ai_copilots",
         }
         # One catch-all nav entry per remaining module -> generic module page.
         for i, (slug, mod) in enumerate(module_by_slug.items()):
@@ -1399,7 +1400,7 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
             )
     roles = {
         c: (await db.execute(select(Role).where(Role.tenant_id == tid, Role.code == c))).scalars().first()
-        for c in ("student", "parent", "teacher")
+        for c in ("student", "parent", "teacher", "principal")
     }
 
     async def _portal_user(email, name, pw, role, person_type, person_id):
@@ -1430,6 +1431,10 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
         await _portal_user("hod@sumaya.edu",
                            f"{principal_emp.first_name} {principal_emp.last_name or ''}".strip(), "Hod@123",
                            roles["teacher"], "employee", principal_emp.id)
+    if principal_emp and roles["principal"]:
+        await _portal_user("principal@sumaya.edu",
+                           f"{principal_emp.first_name} {principal_emp.last_name or ''}".strip(), "Principal@123",
+                           roles["principal"], "employee", principal_emp.id)
 
 
 if __name__ == "__main__":

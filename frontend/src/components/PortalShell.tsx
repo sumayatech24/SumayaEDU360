@@ -14,6 +14,7 @@ const THEMES: Record<string, { from: string; chip: string; tag: string }> = {
   student: { from: "from-indigo-600 to-indigo-800", chip: "bg-indigo-600", tag: "Student Portal" },
   parent: { from: "from-emerald-600 to-emerald-800", chip: "bg-emerald-600", tag: "Parent Portal" },
   teacher: { from: "from-orange-600 to-orange-800", chip: "bg-orange-600", tag: "Teacher Portal" },
+  principal: { from: "from-slate-700 to-slate-900", chip: "bg-slate-700", tag: "Principal Portal" },
 };
 
 export function PortalShell({
@@ -21,7 +22,7 @@ export function PortalShell({
   nav,
   children,
 }: {
-  portal: "student" | "parent" | "teacher";
+  portal: "student" | "parent" | "teacher" | "principal";
   nav: PortalNavItem[];
   children: ReactNode;
 }) {

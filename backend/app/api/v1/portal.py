@@ -121,7 +121,9 @@ def portal_for(roles: list[str], is_super: bool) -> str:
         return "parent"
     if "teacher" in roles:
         return "teacher"
-    return "admin"  # principal, accountant, librarian, ... use the admin shell (RBAC-filtered)
+    if "principal" in roles or "vice_principal" in roles:
+        return "principal"
+    return "admin"  # accountant, librarian, ... use the admin shell (RBAC-filtered)
 
 
 async def _announcements(db: AsyncSession, tid: uuid.UUID, audience: str | None = None) -> list[dict]:
@@ -1151,6 +1153,185 @@ async def teacher_review_marks(
     await db.flush()
     await record_audit(db, action=payload.decision, entity="MarksBatch", entity_id=batch.id, actor=user)
     return {"id": str(batch.id), "status": batch.batch_status}
+
+
+# ===================================================== Principal portal (oversight + approvals)
+def _require_principal(user: CurrentUser) -> str:
+    kind = portal_for(user.roles, user.is_superadmin)
+    if kind not in ("principal", "admin"):
+        raise HTTPException(403, "Principal access only")
+    return kind
+
+
+async def _count_where(db: AsyncSession, model, *conds) -> int:
+    return (await db.execute(select(func.count()).select_from(model).where(*conds))).scalar_one()
+
+
+@router.get("/principal/dashboard")
+async def principal_dashboard(
+    db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user)
+):
+    _require_principal(user)
+    tid = user.tenant_id
+    db_user = await db.get(User, user.id)
+    principal = None
+    if db_user and db_user.person_id:
+        emp = await db.get(Employee, db_user.person_id)
+        if emp:
+            principal = {"name": f"{emp.first_name} {emp.last_name or ''}".strip(),
+                         "designation": emp.designation, "department": emp.department}
+
+    students = await _count_where(db, Student, Student.tenant_id == tid, Student.is_deleted.is_(False))
+    teachers = await _count_where(db, Employee, Employee.tenant_id == tid, Employee.is_deleted.is_(False))
+    pending_marks = await _count_where(db, MarksBatch, MarksBatch.tenant_id == tid,
+                                       MarksBatch.batch_status == "submitted", MarksBatch.is_deleted.is_(False))
+    published_marks = await _count_where(db, MarksBatch, MarksBatch.tenant_id == tid,
+                                         MarksBatch.batch_status == "published", MarksBatch.is_deleted.is_(False))
+    pending_curriculum = await _count_where(db, CurriculumPlan, CurriculumPlan.tenant_id == tid,
+                                            CurriculumPlan.plan_status == "submitted", CurriculumPlan.is_deleted.is_(False))
+    open_complaints = await _count_where(db, Complaint, Complaint.tenant_id == tid,
+                                         Complaint.complaint_status.in_(("open", "assigned", "in_progress", "reopened")),
+                                         Complaint.is_deleted.is_(False))
+    meetings = await _count_where(db, PtmMeeting, PtmMeeting.tenant_id == tid,
+                                  PtmMeeting.meeting_status == "scheduled", PtmMeeting.is_deleted.is_(False))
+    return {
+        "principal": principal,
+        "cards": [
+            {"key": "students", "label": "Students", "value": students, "icon": "users"},
+            {"key": "teachers", "label": "Staff", "value": teachers, "icon": "briefcase"},
+            {"key": "pending_marks", "label": "Marksheets to Approve", "value": pending_marks, "icon": "check-square"},
+            {"key": "pending_curriculum", "label": "Curriculum to Approve", "value": pending_curriculum, "icon": "book"},
+            {"key": "open_complaints", "label": "Open Complaints", "value": open_complaints, "icon": "shield"},
+            {"key": "meetings", "label": "Scheduled Meetings", "value": meetings, "icon": "calendar"},
+            {"key": "published_marks", "label": "Marksheets Published", "value": published_marks, "icon": "trending-up"},
+        ],
+        "announcements": await _announcements(db, tid, "teachers"),
+    }
+
+
+@router.get("/principal/marks-approvals")
+async def principal_marks_approvals(
+    db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user)
+):
+    _require_principal(user)
+    tid = user.tenant_id
+    maps = await _name_maps(db, tid)
+    exam_names = {e.id: e.name for e in (await db.execute(select(Exam).where(Exam.tenant_id == tid))).scalars().all()}
+    emp_names = await _employee_names(db, tid)
+    rows = (await db.execute(select(MarksBatch).where(
+        MarksBatch.tenant_id == tid, MarksBatch.batch_status == "submitted", MarksBatch.is_deleted.is_(False)
+    ).order_by(MarksBatch.updated_at.desc()))).scalars().all()
+    return [
+        {
+            "id": str(b.id), "exam": exam_names.get(b.exam_id, "Exam"),
+            "subject": maps["subjects"].get(b.subject_id, "General"),
+            "grade": maps["grades"].get(b.grade_id, "All"),
+            "section": maps["sections"].get(b.section_id, "All"),
+            "teacher": emp_names.get(b.teacher_id, "—"), "status": b.batch_status, "review_note": b.review_note,
+        }
+        for b in rows
+    ]
+
+
+@router.get("/principal/marks-approvals/{batch_id}")
+async def principal_marks_sheet(
+    batch_id: uuid.UUID, db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user)
+):
+    _require_principal(user)
+    batch = await db.get(MarksBatch, batch_id)
+    if not batch or batch.tenant_id != user.tenant_id or batch.is_deleted:
+        raise HTTPException(404, "Marks batch not found")
+    students = await _assignment_roster(
+        db, user, type("Scope", (), {"grade_id": batch.grade_id, "section_id": batch.section_id})())
+    marks = (await db.execute(select(Marks).where(
+        Marks.tenant_id == user.tenant_id, Marks.exam_id == batch.exam_id,
+        Marks.subject_id == batch.subject_id, Marks.is_deleted.is_(False)))).scalars().all()
+    by_student = {m.student_id: m for m in marks}
+    return {
+        "id": str(batch.id), "status": batch.batch_status, "review_note": batch.review_note,
+        "rows": [
+            {
+                "student_id": str(s.id), "roll_no": s.roll_no, "admission_no": s.admission_no,
+                "student_name": f"{s.first_name} {s.last_name or ''}".strip(),
+                "marks_obtained": str(by_student[s.id].marks_obtained) if s.id in by_student else "",
+                "max_marks": str(by_student[s.id].max_marks) if s.id in by_student else "",
+                "is_absent": by_student[s.id].is_absent if s.id in by_student else False,
+                "grade": by_student[s.id].grade_letter if s.id in by_student else None,
+            }
+            for s in students
+        ],
+    }
+
+
+@router.post("/principal/marks-approvals/{batch_id}")
+async def principal_review_marks(
+    batch_id: uuid.UUID, payload: MarksReviewIn,
+    db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user),
+):
+    _require_principal(user)
+    if payload.decision not in ("approved", "rejected"):
+        raise HTTPException(422, "decision must be approved or rejected")
+    batch = await db.get(MarksBatch, batch_id)
+    if not batch or batch.tenant_id != user.tenant_id or batch.is_deleted:
+        raise HTTPException(404, "Marks batch not found")
+    if batch.batch_status != "submitted":
+        raise HTTPException(409, "Only submitted marks can be reviewed")
+    batch.batch_status = "published" if payload.decision == "approved" else "rejected"
+    batch.review_note = payload.review_note
+    batch.reviewed_at = datetime.now(timezone.utc)
+    if payload.decision == "approved":
+        batch.published_at = datetime.now(timezone.utc)
+    batch.updated_by = user.id
+    await db.flush()
+    await record_audit(db, action=f"principal_{payload.decision}", entity="MarksBatch", entity_id=batch.id, actor=user)
+    return {"id": str(batch.id), "status": batch.batch_status}
+
+
+def _plan_brief(p: CurriculumPlan, maps: dict, emp_names: dict) -> dict:
+    return {
+        "id": str(p.id), "title": p.title, "term": p.term,
+        "grade": maps["grades"].get(p.grade_id, "—"), "section": maps["sections"].get(p.section_id, "—"),
+        "subject": maps["subjects"].get(p.subject_id, "General"),
+        "teacher": emp_names.get(p.teacher_id, "—"),
+        "objectives": p.objectives, "topics": p.topics or [],
+        "status": p.plan_status, "review_note": p.review_note,
+    }
+
+
+@router.get("/principal/curriculum-approvals")
+async def principal_curriculum_approvals(
+    db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user)
+):
+    _require_principal(user)
+    tid = user.tenant_id
+    maps = await _name_maps(db, tid)
+    emp_names = await _employee_names(db, tid)
+    rows = (await db.execute(select(CurriculumPlan).where(
+        CurriculumPlan.tenant_id == tid, CurriculumPlan.plan_status == "submitted",
+        CurriculumPlan.is_deleted.is_(False)).order_by(CurriculumPlan.submitted_at.desc().nullslast()))).scalars().all()
+    return [_plan_brief(p, maps, emp_names) for p in rows]
+
+
+@router.post("/principal/curriculum-approvals/{plan_id}")
+async def principal_review_curriculum(
+    plan_id: uuid.UUID, payload: PlanReviewIn,
+    db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user),
+):
+    _require_principal(user)
+    if payload.decision not in ("approved", "rejected"):
+        raise HTTPException(422, "decision must be approved or rejected")
+    plan = await db.get(CurriculumPlan, plan_id)
+    if not plan or plan.tenant_id != user.tenant_id or plan.is_deleted:
+        raise HTTPException(404, "Plan not found")
+    if plan.plan_status != "submitted":
+        raise HTTPException(409, "Only submitted plans can be reviewed")
+    plan.plan_status = payload.decision
+    plan.review_note = payload.review_note
+    plan.reviewed_at = datetime.now(timezone.utc)
+    plan.updated_by = user.id
+    await db.flush()
+    await record_audit(db, action=f"principal_{payload.decision}", entity="CurriculumPlan", entity_id=plan.id, actor=user)
+    return {"id": str(plan.id), "status": plan.plan_status}
 
 
 @router.post("/teacher/submissions/{submission_id}/grade")

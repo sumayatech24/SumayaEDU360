@@ -68,8 +68,13 @@ client → JWT bearer → get_current_user → resolves roles → union of permi
 - Immutable `audit_log` written on every mutation (create/update/delete/login/promote/…).
 - RBAC sourced from the requirement matrix; superadmin + `module:*` wildcards supported.
 
-## Roadmap hooks (already scaffolded)
+## Roadmap hooks and governed AI foundation
 
-- AI Copilots module present; RAG/agent endpoints can attach under `/api/v1/<module>/...`.
+- AI Copilots are live under `/api/v1/ai`: tenant/user-scoped sessions and messages,
+  model/prompt provenance, feedback, explainable predictors and reviewed insights.
+- Agentic workflows are safe-by-default proposals with allow-listed tools, dry-run plans,
+  idempotency keys, explicit approval/cancel/reject states and immutable audit events.
+- External LLM/RAG providers and write-capable business tools remain adapters: they cannot
+  bypass the existing RBAC, tenant scope, human approval or audit contracts.
 - Integrations module (WhatsApp/SMS/Payment/SSO) modeled as configurable settings.
 - Alembic is included for production migrations (bootstrap uses `create_all` + seeder).

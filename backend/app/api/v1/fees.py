@@ -17,13 +17,16 @@ from app.core.deps import CurrentUser, require_permission
 from app.models.academic import AcademicYear, Grade, Section
 from app.models.auth import User
 from app.models.fees import (
+    CashierSession,
     FeeInstallment,
     FeePlan,
     FeePlanComponent,
     FeeReminder,
+    FeeRefund,
     Invoice,
     InvoiceLineItem,
     Payment,
+    PaymentReconciliation,
     StudentFeeAccount,
 )
 from app.models.meta import Notification
@@ -101,6 +104,36 @@ class PaymentOut(BaseModel):
 class ReminderIn(BaseModel):
     invoice_ids: list[uuid.UUID]
     channels: list[str] = ["in_app"]
+
+
+class RefundIn(BaseModel):
+    payment_id: uuid.UUID
+    amount: Decimal = Field(gt=0)
+    reason: str = Field(min_length=3, max_length=1000)
+
+
+class RefundDecisionIn(BaseModel):
+    decision: str
+    reference: str | None = None
+
+
+class ReconciliationIn(BaseModel):
+    provider: str
+    provider_reference: str
+    payment_id: uuid.UUID | None = None
+    expected_amount: Decimal = Field(ge=0)
+    settled_amount: Decimal = Field(ge=0)
+    settlement_date: date | None = None
+    notes: str | None = None
+
+
+class CashierOpenIn(BaseModel):
+    opening_float: Decimal = Field(default=Decimal(0), ge=0)
+
+
+class CashierCloseIn(BaseModel):
+    counted_cash: Decimal = Field(ge=0)
+    notes: str | None = None
 
 
 @router.post("/plans", status_code=201)
@@ -602,6 +635,26 @@ async def list_invoice_payments(
     ).order_by(Payment.created_at.desc()))).scalars().all()
 
 
+@router.get("/payments")
+async def list_payments(
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_permission("fees_billing:read")),
+):
+    rows = (await db.execute(select(Payment).where(
+        Payment.tenant_id == user.tenant_id, Payment.is_deleted.is_(False),
+    ).order_by(Payment.created_at.desc()).limit(200))).scalars().all()
+    students = {
+        s.id: f"{s.first_name} {s.last_name or ''}".strip()
+        for s in (await db.execute(select(Student).where(Student.tenant_id == user.tenant_id))).scalars().all()
+    }
+    return [{
+        "id": str(p.id), "receipt_no": p.receipt_no, "invoice_id": str(p.invoice_id),
+        "student": students.get(p.student_id, "—"), "amount": str(p.amount),
+        "method": p.method, "reference": p.reference,
+        "paid_at": p.paid_at.isoformat() if p.paid_at else None,
+    } for p in rows]
+
+
 @router.get("/students/{student_id}/ledger")
 async def student_ledger(
     student_id: uuid.UUID,
@@ -637,3 +690,191 @@ async def student_ledger(
             for invoice in invoices
         ],
     }
+
+
+@router.get("/refunds")
+async def list_refunds(
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_permission("fees_billing:read")),
+):
+    rows = (await db.execute(select(FeeRefund).where(
+        FeeRefund.tenant_id == user.tenant_id, FeeRefund.is_deleted.is_(False),
+    ).order_by(FeeRefund.created_at.desc()))).scalars().all()
+    return [{
+        "id": str(r.id), "refund_no": r.refund_no, "payment_id": str(r.payment_id),
+        "invoice_id": str(r.invoice_id), "student_id": str(r.student_id),
+        "amount": str(r.amount), "reason": r.reason, "status": r.refund_status,
+        "reference": r.reference, "processed_at": r.processed_at.isoformat() if r.processed_at else None,
+    } for r in rows]
+
+
+@router.post("/refunds", status_code=201)
+async def request_refund(
+    payload: RefundIn,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_permission("fees_billing:update")),
+):
+    payment = await db.get(Payment, payload.payment_id)
+    if not payment or payment.tenant_id != user.tenant_id or payment.is_deleted:
+        raise HTTPException(404, "Payment not found")
+    prior = (await db.execute(select(func.coalesce(func.sum(FeeRefund.amount), 0)).where(
+        FeeRefund.tenant_id == user.tenant_id, FeeRefund.payment_id == payment.id,
+        FeeRefund.refund_status.in_(("requested", "approved", "processed")),
+        FeeRefund.is_deleted.is_(False),
+    ))).scalar_one()
+    if Decimal(prior) + payload.amount > Decimal(payment.amount):
+        raise HTTPException(409, "Refund exceeds the unrefunded payment amount")
+    count = (await db.execute(select(func.count()).select_from(FeeRefund).where(
+        FeeRefund.tenant_id == user.tenant_id
+    ))).scalar_one()
+    row = FeeRefund(
+        tenant_id=user.tenant_id, refund_no=f"REF-{date.today().year}-{count + 1:05d}",
+        payment_id=payment.id, invoice_id=payment.invoice_id, student_id=payment.student_id,
+        amount=payload.amount, reason=payload.reason, created_by=user.id, updated_by=user.id,
+    )
+    db.add(row)
+    await db.flush()
+    await record_audit(db, action="request", entity="FeeRefund", entity_id=row.id, actor=user)
+    return {"id": str(row.id), "refund_no": row.refund_no, "status": row.refund_status}
+
+
+@router.post("/refunds/{refund_id}/decision")
+async def decide_refund(
+    refund_id: uuid.UUID,
+    payload: RefundDecisionIn,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_permission("fees_billing:approve")),
+):
+    row = await db.get(FeeRefund, refund_id)
+    if not row or row.tenant_id != user.tenant_id or row.is_deleted:
+        raise HTTPException(404, "Refund not found")
+    if payload.decision not in ("approved", "rejected", "processed"):
+        raise HTTPException(422, "Decision must be approved, rejected or processed")
+    if payload.decision in ("approved", "rejected") and row.refund_status != "requested":
+        raise HTTPException(409, "Only requested refunds can be approved or rejected")
+    if payload.decision == "processed":
+        if row.refund_status != "approved":
+            raise HTTPException(409, "Only an approved refund can be processed")
+        invoice = await db.get(Invoice, row.invoice_id)
+        if not invoice:
+            raise HTTPException(409, "Refund invoice is unavailable")
+        invoice.paid_amount = max(Decimal(invoice.paid_amount) - Decimal(row.amount), Decimal(0))
+        invoice.payment_status = _status(Decimal(invoice.net_amount), Decimal(invoice.paid_amount), invoice.due_date)
+        row.processed_at = datetime.now(timezone.utc)
+        row.reference = payload.reference
+    if payload.decision == "approved":
+        row.approved_by = user.id
+    row.refund_status, row.updated_by = payload.decision, user.id
+    await record_audit(db, action=payload.decision, entity="FeeRefund", entity_id=row.id, actor=user)
+    return {"id": str(row.id), "status": row.refund_status}
+
+
+@router.get("/reconciliations")
+async def list_reconciliations(
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_permission("fees_billing:read")),
+):
+    rows = (await db.execute(select(PaymentReconciliation).where(
+        PaymentReconciliation.tenant_id == user.tenant_id,
+        PaymentReconciliation.is_deleted.is_(False),
+    ).order_by(PaymentReconciliation.created_at.desc()))).scalars().all()
+    return [{
+        "id": str(r.id), "provider": r.provider, "provider_reference": r.provider_reference,
+        "payment_id": str(r.payment_id) if r.payment_id else None,
+        "expected_amount": str(r.expected_amount), "settled_amount": str(r.settled_amount),
+        "settlement_date": r.settlement_date.isoformat() if r.settlement_date else None,
+        "status": r.reconciliation_status, "notes": r.notes,
+    } for r in rows]
+
+
+@router.post("/reconciliations", status_code=201)
+async def reconcile_payment(
+    payload: ReconciliationIn,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_permission("fees_billing:update")),
+):
+    payment = await db.get(Payment, payload.payment_id) if payload.payment_id else None
+    if payment and (payment.tenant_id != user.tenant_id or payment.is_deleted):
+        raise HTTPException(404, "Payment not found")
+    if payment and Decimal(payment.amount) != payload.expected_amount:
+        raise HTTPException(409, "Expected amount does not match the recorded payment")
+    recon_status = "unmatched" if not payment else (
+        "matched" if payload.expected_amount == payload.settled_amount else "mismatch"
+    )
+    row = PaymentReconciliation(
+        tenant_id=user.tenant_id, reconciliation_status=recon_status,
+        **payload.model_dump(), created_by=user.id, updated_by=user.id,
+    )
+    db.add(row)
+    await db.flush()
+    await record_audit(db, action="reconcile", entity="PaymentReconciliation", entity_id=row.id, actor=user)
+    return {"id": str(row.id), "status": recon_status}
+
+
+@router.get("/cashier-sessions")
+async def cashier_sessions(
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_permission("fees_billing:read")),
+):
+    rows = (await db.execute(select(CashierSession).where(
+        CashierSession.tenant_id == user.tenant_id, CashierSession.is_deleted.is_(False),
+    ).order_by(CashierSession.business_date.desc(), CashierSession.opened_at.desc()))).scalars().all()
+    return [{
+        "id": str(r.id), "business_date": r.business_date.isoformat(),
+        "opening_float": str(r.opening_float), "system_cash": str(r.system_cash),
+        "counted_cash": str(r.counted_cash) if r.counted_cash is not None else None,
+        "variance": str(r.variance) if r.variance is not None else None,
+        "status": r.session_status, "notes": r.close_notes,
+    } for r in rows]
+
+
+@router.post("/cashier-sessions/open", status_code=201)
+async def open_cashier(
+    payload: CashierOpenIn,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_permission("fees_billing:update")),
+):
+    existing = (await db.execute(select(CashierSession).where(
+        CashierSession.tenant_id == user.tenant_id, CashierSession.cashier_id == user.id,
+        CashierSession.session_status == "open", CashierSession.is_deleted.is_(False),
+    ))).scalars().first()
+    if existing:
+        raise HTTPException(409, "Cashier already has an open session")
+    row = CashierSession(
+        tenant_id=user.tenant_id, cashier_id=user.id, business_date=date.today(),
+        opened_at=datetime.now(timezone.utc), opening_float=payload.opening_float,
+        created_by=user.id, updated_by=user.id,
+    )
+    db.add(row)
+    await db.flush()
+    await record_audit(db, action="open", entity="CashierSession", entity_id=row.id, actor=user)
+    return {"id": str(row.id), "status": "open"}
+
+
+@router.post("/cashier-sessions/{session_id}/close")
+async def close_cashier(
+    session_id: uuid.UUID,
+    payload: CashierCloseIn,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_permission("fees_billing:update")),
+):
+    row = await db.get(CashierSession, session_id)
+    if not row or row.tenant_id != user.tenant_id or row.cashier_id != user.id or row.is_deleted:
+        raise HTTPException(404, "Cashier session not found")
+    if row.session_status != "open":
+        raise HTTPException(409, "Cashier session is already closed")
+    cash = (await db.execute(select(func.coalesce(func.sum(Payment.amount), 0)).where(
+        Payment.tenant_id == user.tenant_id, Payment.method == "cash",
+        Payment.paid_at == row.business_date, Payment.is_deleted.is_(False),
+        Payment.created_by == user.id,
+    ))).scalar_one()
+    row.system_cash = Decimal(row.opening_float) + Decimal(cash)
+    row.counted_cash = payload.counted_cash
+    row.variance = payload.counted_cash - Decimal(row.system_cash)
+    row.closed_at, row.session_status, row.close_notes = datetime.now(timezone.utc), "closed", payload.notes
+    row.updated_by = user.id
+    await record_audit(db, action="close", entity="CashierSession", entity_id=row.id, actor=user,
+                       changes={"system_cash": row.system_cash, "counted_cash": row.counted_cash,
+                                "variance": row.variance})
+    return {"id": str(row.id), "status": "closed", "system_cash": str(row.system_cash),
+            "counted_cash": str(row.counted_cash), "variance": str(row.variance)}

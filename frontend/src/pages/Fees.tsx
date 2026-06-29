@@ -24,6 +24,10 @@ interface DuesResponse {
   rows: DueRow[];
   summary: { invoices: number; billed: string; paid: string; pending: string; overdue: number };
 }
+interface FeePayment { id: string; receipt_no: string; student: string; amount: string; method: string; paid_at?: string }
+interface FeeRefund { id: string; refund_no: string; amount: string; reason: string; status: string }
+interface CashierSession { id: string; business_date: string; opening_float: string; system_cash: string; counted_cash?: string; variance?: string; status: string }
+interface Reconciliation { id: string; provider: string; provider_reference: string; expected_amount: string; settled_amount: string; status: string }
 
 const STATUS_TONE: Record<string, string> = {
   paid: "bg-emerald-50 text-emerald-600", partial: "bg-amber-50 text-amber-600",
@@ -39,7 +43,7 @@ const emptyComponents = () => [
 
 export function Fees() {
   const qc = useQueryClient();
-  const [tab, setTab] = useState<"dues" | "plans">("dues");
+  const [tab, setTab] = useState<"dues" | "plans" | "operations">("dues");
   const [year, setYear] = useState("");
   const [grade, setGrade] = useState("");
   const [section, setSection] = useState("");
@@ -61,6 +65,9 @@ export function Fees() {
   const [assignGrade, setAssignGrade] = useState("");
   const [assignSection, setAssignSection] = useState("");
   const [aidPercent, setAidPercent] = useState("");
+  const [refundForm, setRefundForm] = useState({ payment_id: "", amount: "", reason: "" });
+  const [openingFloat, setOpeningFloat] = useState("0");
+  const [reconForm, setReconForm] = useState({ provider: "razorpay", provider_reference: "", payment_id: "", expected_amount: "", settled_amount: "" });
 
   const years = useQuery({
     queryKey: ["fee-years"],
@@ -91,6 +98,22 @@ export function Fees() {
   const methods = useQuery({
     queryKey: ["payment-methods"],
     queryFn: async () => (await api.get<{ code: string; label: string }[]>("/master-types/payment_method/values")).data,
+  });
+  const payments = useQuery({
+    queryKey: ["fee-payments"],
+    queryFn: async () => (await api.get<FeePayment[]>("/fees/payments")).data,
+  });
+  const refunds = useQuery({
+    queryKey: ["fee-refunds"],
+    queryFn: async () => (await api.get<FeeRefund[]>("/fees/refunds")).data,
+  });
+  const cashier = useQuery({
+    queryKey: ["cashier-sessions"],
+    queryFn: async () => (await api.get<CashierSession[]>("/fees/cashier-sessions")).data,
+  });
+  const reconciliations = useQuery({
+    queryKey: ["payment-reconciliations"],
+    queryFn: async () => (await api.get<Reconciliation[]>("/fees/reconciliations")).data,
   });
   const allInstallments = useMemo(
     () => (plans.data ?? []).flatMap((plan) => plan.installments),
@@ -144,6 +167,49 @@ export function Fees() {
     },
     onError: (e) => setError(apiError(e)),
   });
+  const requestRefund = useMutation({
+    mutationFn: async () => api.post("/fees/refunds", { ...refundForm, amount: Number(refundForm.amount) }),
+    onSuccess: () => {
+      setRefundForm({ payment_id: "", amount: "", reason: "" });
+      setNotice("Refund submitted for independent approval.");
+      qc.invalidateQueries({ queryKey: ["fee-refunds"] });
+    },
+    onError: (e) => setError(apiError(e)),
+  });
+  const refundDecision = useMutation({
+    mutationFn: async ({ id, decision }: { id: string; decision: string }) =>
+      api.post(`/fees/refunds/${id}/decision`, { decision, reference: decision === "processed" ? `MANUAL-${Date.now()}` : null }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["fee-refunds"] });
+      qc.invalidateQueries({ queryKey: ["fee-dues"] });
+    },
+    onError: (e) => setError(apiError(e)),
+  });
+  const openCashier = useMutation({
+    mutationFn: async () => api.post("/fees/cashier-sessions/open", { opening_float: Number(openingFloat) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["cashier-sessions"] }),
+    onError: (e) => setError(apiError(e)),
+  });
+  const closeCashier = useMutation({
+    mutationFn: async (session: CashierSession) => {
+      const counted = window.prompt("Counted cash at close", String(Number(session.opening_float) + Number(session.system_cash)));
+      if (counted === null) throw new Error("Close cancelled");
+      return api.post(`/fees/cashier-sessions/${session.id}/close`, { counted_cash: Number(counted) });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["cashier-sessions"] }),
+    onError: (e) => setError(apiError(e)),
+  });
+  const reconcile = useMutation({
+    mutationFn: async () => api.post("/fees/reconciliations", {
+      ...reconForm, payment_id: reconForm.payment_id || null,
+      expected_amount: Number(reconForm.expected_amount), settled_amount: Number(reconForm.settled_amount),
+    }),
+    onSuccess: () => {
+      setReconForm({ provider: "razorpay", provider_reference: "", payment_id: "", expected_amount: "", settled_amount: "" });
+      qc.invalidateQueries({ queryKey: ["payment-reconciliations"] });
+    },
+    onError: (e) => setError(apiError(e)),
+  });
 
   return (
     <div className="space-y-5">
@@ -152,6 +218,7 @@ export function Fees() {
       <div className="flex gap-2 border-b">
         <button className={tab === "dues" ? "btn-primary" : "btn-ghost"} onClick={() => setTab("dues")}>Student-wise Dues</button>
         <button className={tab === "plans" ? "btn-primary" : "btn-ghost"} onClick={() => setTab("plans")}>Fee Plans & Assignment</button>
+        <button className={tab === "operations" ? "btn-primary" : "btn-ghost"} onClick={() => setTab("operations")}>Refunds & Cashier Close</button>
       </div>
       {notice && <div className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700">{notice}</div>}
       {error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
@@ -223,6 +290,33 @@ export function Fees() {
             <button className="btn-primary" disabled={!assignPlan || assign.isPending} onClick={() => assign.mutate()}>Generate student installments</button>
           </div>
           {plans.data?.map((plan) => <div className="card p-4" key={plan.id}><div className="font-semibold">{plan.name}</div><div className="text-xs text-slate-400">{plan.frequency} · {money(plan.amount)} · {plan.installments.length} installment(s)</div><div className="mt-2 flex flex-wrap gap-1">{plan.components.map((component) => <span className="badge bg-slate-100" key={component.id}>{component.head}: {money(component.amount)}{component.aid_eligible ? " · aid" : ""}</span>)}</div></div>)}
+        </div>
+      </div>}
+
+      {tab === "operations" && <div className="grid gap-5 xl:grid-cols-2">
+        <div className="card space-y-4 p-5">
+          <div><h2 className="font-semibold">Refund control</h2><p className="text-xs text-slate-400">Requests require approval before processing and automatically reopen the invoice balance.</p></div>
+          <select className="input" value={refundForm.payment_id} onChange={(e) => {
+            const selectedPayment = payments.data?.find((p) => p.id === e.target.value);
+            setRefundForm({ ...refundForm, payment_id: e.target.value, amount: selectedPayment?.amount || "" });
+          }}><option value="">Select receipt</option>{payments.data?.map((p) => <option key={p.id} value={p.id}>{p.receipt_no} · {p.student} · {money(p.amount)}</option>)}</select>
+          <div className="grid grid-cols-2 gap-2"><input className="input" type="number" placeholder="Refund amount" value={refundForm.amount} onChange={(e) => setRefundForm({ ...refundForm, amount: e.target.value })} /><input className="input" placeholder="Reason" value={refundForm.reason} onChange={(e) => setRefundForm({ ...refundForm, reason: e.target.value })} /></div>
+          <button className="btn-primary" disabled={!refundForm.payment_id || Number(refundForm.amount) <= 0 || refundForm.reason.length < 3} onClick={() => requestRefund.mutate()}>Request refund</button>
+          <div className="space-y-2">{refunds.data?.map((r) => <div key={r.id} className="rounded-lg border p-3 text-sm"><div className="flex justify-between"><span className="font-semibold">{r.refund_no} · {money(r.amount)}</span><span className="badge bg-slate-100 capitalize">{r.status}</span></div><div className="text-xs text-slate-500">{r.reason}</div><div className="mt-2 flex gap-2">{r.status === "requested" && <><button className="btn-primary text-xs" onClick={() => refundDecision.mutate({ id: r.id, decision: "approved" })}>Approve</button><button className="btn-ghost text-xs" onClick={() => refundDecision.mutate({ id: r.id, decision: "rejected" })}>Reject</button></>}{r.status === "approved" && <button className="btn-primary text-xs" onClick={() => refundDecision.mutate({ id: r.id, decision: "processed" })}>Process refund</button>}</div></div>)}</div>
+        </div>
+        <div className="card space-y-4 p-5">
+          <div><h2 className="font-semibold">Cashier session & daily close</h2><p className="text-xs text-slate-400">Reconciles recorded cash against the physical count and records variance.</p></div>
+          {!cashier.data?.some((s) => s.status === "open") && <div className="flex gap-2"><input className="input" type="number" value={openingFloat} onChange={(e) => setOpeningFloat(e.target.value)} /><button className="btn-primary whitespace-nowrap" onClick={() => openCashier.mutate()}>Open till</button></div>}
+          <div className="space-y-2">{cashier.data?.map((s) => <div key={s.id} className="rounded-lg border p-3 text-sm"><div className="flex justify-between"><span className="font-semibold">{s.business_date}</span><span className="badge bg-slate-100 capitalize">{s.status}</span></div><div className="text-xs text-slate-500">Opening {money(s.opening_float)} · System {money(s.system_cash)}{s.variance !== undefined && ` · Variance ${money(s.variance)}`}</div>{s.status === "open" && <button className="btn-primary mt-2 text-xs" onClick={() => closeCashier.mutate(s)}>Count & close</button>}</div>)}</div>
+          <div className="border-t pt-4"><h3 className="mb-2 text-sm font-semibold">Gateway reconciliation</h3>
+            <div className="grid gap-2">
+              <select className="input" value={reconForm.payment_id} onChange={(e) => { const p = payments.data?.find((item) => item.id === e.target.value); setReconForm({ ...reconForm, payment_id: e.target.value, expected_amount: p?.amount || "", settled_amount: p?.amount || "" }); }}><option value="">Unmatched settlement</option>{payments.data?.filter((p) => p.method !== "cash").map((p) => <option key={p.id} value={p.id}>{p.receipt_no} · {money(p.amount)}</option>)}</select>
+              <div className="grid grid-cols-2 gap-2"><input className="input" placeholder="Provider" value={reconForm.provider} onChange={(e) => setReconForm({ ...reconForm, provider: e.target.value })} /><input className="input" placeholder="Provider reference" value={reconForm.provider_reference} onChange={(e) => setReconForm({ ...reconForm, provider_reference: e.target.value })} /></div>
+              <div className="grid grid-cols-2 gap-2"><input className="input" type="number" placeholder="Expected" value={reconForm.expected_amount} onChange={(e) => setReconForm({ ...reconForm, expected_amount: e.target.value })} /><input className="input" type="number" placeholder="Settled" value={reconForm.settled_amount} onChange={(e) => setReconForm({ ...reconForm, settled_amount: e.target.value })} /></div>
+              <button className="btn-primary text-xs" disabled={!reconForm.provider_reference || !reconForm.expected_amount} onClick={() => reconcile.mutate()}>Reconcile settlement</button>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">{reconciliations.data?.slice(0, 8).map((r) => <span key={r.id} className="badge bg-slate-100">{r.provider_reference} · {r.status}</span>)}</div>
+          </div>
         </div>
       </div>}
 

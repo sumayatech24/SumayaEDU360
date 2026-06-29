@@ -116,6 +116,53 @@ async def test_student_transfer_tc_and_reenrollment_lifecycle(client):
 
 
 @pytest.mark.asyncio
+async def test_medical_consent_parent_visibility_and_alumni_guard(client):
+    admin = await _login(client, "admin@sumaya.edu", "Admin@123")
+    parent = await _login(client, "parent@sumaya.edu", "Parent@123")
+    dashboard = await client.get("/api/v1/portal/student/dashboard", headers=parent)
+    assert dashboard.status_code == 200, dashboard.text
+    student_id = dashboard.json()["student"]["id"]
+
+    medical = await client.post(
+        f"/api/v1/student-lifecycle/students/{student_id}/medical-records",
+        headers=admin,
+        json={
+            "record_type": "allergy", "recorded_on": "2026-06-29",
+            "condition": "Peanut allergy", "details": "Avoid all peanut products",
+            "emergency_action": "Use prescribed medication and contact guardian",
+            "visible_to_parent": True,
+        },
+    )
+    assert medical.status_code == 201, medical.text
+    consent = await client.post(
+        f"/api/v1/student-lifecycle/students/{student_id}/consents",
+        headers=admin,
+        json={"consent_type": "field_trip", "policy_version": "2026.1"},
+    )
+    assert consent.status_code == 201, consent.text
+    consent_id = consent.json()["id"]
+
+    dashboard = await client.get("/api/v1/portal/student/dashboard", headers=parent)
+    assert any(r["condition"] == "Peanut allergy" for r in dashboard.json()["medical_records"])
+    assert any(r["id"] == consent_id and r["status"] == "pending" for r in dashboard.json()["consents"])
+    response = await client.post(
+        f"/api/v1/portal/parent/consents/{consent_id}/respond",
+        headers=parent,
+        json={"decision": "granted", "guardian_name": "Demo Parent"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "granted"
+
+    # Alumni conversion cannot bypass the graduation lifecycle.
+    alumni = await client.post(
+        f"/api/v1/student-lifecycle/students/{student_id}/alumni",
+        headers=admin,
+        json={"graduation_year": 2026, "directory_opt_in": False},
+    )
+    assert alumni.status_code == 409
+
+
+@pytest.mark.asyncio
 async def test_protected_without_token(client):
     r = await client.get("/api/v1/modules")
     assert r.status_code == 401
@@ -605,6 +652,39 @@ async def test_academic_year_installment_fees_aid_dues_and_reminders(client):
         json={"invoice_id": row["id"], "amount": 500, "method": "upi"},
     )
     assert paid.status_code == 201, paid.text
+    reconciliation = await client.post(
+        "/api/v1/fees/reconciliations",
+        headers=admin,
+        json={
+            "provider": "test_gateway", "provider_reference": "SETTLEMENT-HY-001",
+            "payment_id": paid.json()["id"], "expected_amount": 500, "settled_amount": 500,
+            "settlement_date": "2026-06-29",
+        },
+    )
+    assert reconciliation.status_code == 201, reconciliation.text
+    assert reconciliation.json()["status"] == "matched"
+    refund = await client.post(
+        "/api/v1/fees/refunds", headers=admin,
+        json={"payment_id": paid.json()["id"], "amount": 100, "reason": "Approved fee adjustment"},
+    )
+    assert refund.status_code == 201, refund.text
+    refund_id = refund.json()["id"]
+    for decision in ("approved", "processed"):
+        decided = await client.post(
+            f"/api/v1/fees/refunds/{refund_id}/decision", headers=admin,
+            json={"decision": decision, "reference": "REFUND-SETTLED-001" if decision == "processed" else None},
+        )
+        assert decided.status_code == 200, decided.text
+    cashier = await client.post(
+        "/api/v1/fees/cashier-sessions/open", headers=admin, json={"opening_float": 1000},
+    )
+    assert cashier.status_code == 201, cashier.text
+    closed = await client.post(
+        f"/api/v1/fees/cashier-sessions/{cashier.json()['id']}/close",
+        headers=admin, json={"counted_cash": 1000, "notes": "Smoke-test close"},
+    )
+    assert closed.status_code == 200, closed.text
+    assert float(closed.json()["variance"]) == 0
     overpay = await client.post(
         "/api/v1/fees/payments",
         headers=admin,

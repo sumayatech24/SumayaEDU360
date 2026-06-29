@@ -27,13 +27,16 @@ from app.models.auth import (  # noqa: F401
 )
 from app.models.exams import Exam, ExamSubject, Marks, MarksBatch, QuestionPaper  # noqa: F401
 from app.models.fees import (  # noqa: F401
+    CashierSession,
     FeeInstallment,
     FeePlan,
     FeePlanComponent,
     FeeReminder,
+    FeeRefund,
     Invoice,
     InvoiceLineItem,
     Payment,
+    PaymentReconciliation,
     StudentFeeAccount,
 )
 from app.models.meta import (  # noqa: F401
@@ -138,7 +141,8 @@ __all__ = [
     "Permission", "Role", "RolePermission", "User", "UserRole",
     "Exam", "ExamSubject", "Marks", "MarksBatch", "QuestionPaper",
     "FeePlan", "FeePlanComponent", "FeeInstallment", "StudentFeeAccount",
-    "Invoice", "InvoiceLineItem", "Payment", "FeeReminder",
+    "Invoice", "InvoiceLineItem", "Payment", "FeeReminder", "FeeRefund",
+    "PaymentReconciliation", "CashierSession",
     "AuditLog", "Document", "EntityDef", "EntityRecord", "FieldDef", "MasterType",
     "MasterValue", "MenuItem", "Module", "ModuleCapability", "Notification", "Setting",
     "Employee", "Guardian", "Student", "Teacher", "TeacherAssignment", "TeacherProfile",

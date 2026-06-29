@@ -33,6 +33,8 @@ interface Dash {
     recent_attendance: { date: string; status: string; remarks?: string }[];
   } | null;
   remarks?: { type: string; remark: string; by?: string; date?: string }[];
+  medical_records?: { type: string; date: string; condition: string; details?: string; medication?: string; emergency_action?: string }[];
+  consents?: { id: string; type: string; status: string; policy_version: string; requested_on: string; responded_on?: string }[];
   announcements: { title: string; body?: string; date?: string }[];
 }
 
@@ -153,6 +155,17 @@ function AnnouncementsCard({ items }: { items: { title: string; body?: string; d
 function Student360View({ childView }: { childView?: boolean }) {
   const { data, isLoading } = useStudentDash();
   const brand = useBranding();
+  const qc = useQueryClient();
+  const respondConsent = async (id: string, decision: string) => {
+    const guardian_name = window.prompt("Guardian name confirming this decision");
+    if (!guardian_name) return;
+    try {
+      await api.post(`/portal/parent/consents/${id}/respond`, { decision, guardian_name });
+      qc.invalidateQueries({ queryKey: ["portal-student-dash"] });
+    } catch (error) {
+      window.alert(apiError(error));
+    }
+  };
   if (isLoading) return <div className="text-slate-400">Loading…</div>;
   if (!data) return <div className="text-slate-400">No data.</div>;
 
@@ -233,6 +246,36 @@ function Student360View({ childView }: { childView?: boolean }) {
             ))}
           </div>
         )}
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="card p-5">
+          <h3 className="mb-3 text-sm font-semibold text-slate-600">Health & Emergency Information</h3>
+          <div className="space-y-2">
+            {(data.medical_records ?? []).map((record, i) => (
+              <div key={i} className="rounded-lg bg-rose-50 p-3 text-sm">
+                <div className="font-semibold capitalize">{record.type}: {record.condition}</div>
+                <div className="text-xs text-slate-600">{record.details || "No additional details"}{record.medication ? ` · Medication: ${record.medication}` : ""}</div>
+                {record.emergency_action && <div className="mt-1 text-xs font-medium text-rose-700">Emergency action: {record.emergency_action}</div>}
+              </div>
+            ))}
+            {!data.medical_records?.length && <p className="text-sm text-slate-400">No parent-visible medical records.</p>}
+          </div>
+        </div>
+        <div className="card p-5">
+          <h3 className="mb-3 text-sm font-semibold text-slate-600">Guardian Consents</h3>
+          <div className="space-y-2">
+            {(data.consents ?? []).map((consent) => (
+              <div key={consent.id} className="rounded-lg border border-slate-100 p-3 text-sm">
+                <div className="flex items-center justify-between"><span className="font-semibold capitalize">{consent.type.replace(/_/g, " ")}</span><span className="badge bg-slate-100 capitalize">{consent.status}</span></div>
+                <div className="text-xs text-slate-500">Policy {consent.policy_version} · requested {consent.requested_on}</div>
+                {childView && consent.status === "pending" && <div className="mt-2 flex gap-2"><button className="btn-primary text-xs" onClick={() => respondConsent(consent.id, "granted")}>Grant</button><button className="btn-ghost text-xs" onClick={() => respondConsent(consent.id, "declined")}>Decline</button></div>}
+                {childView && consent.status === "granted" && <button className="btn-ghost mt-2 text-xs text-rose-600" onClick={() => respondConsent(consent.id, "revoked")}>Revoke</button>}
+              </div>
+            ))}
+            {!data.consents?.length && <p className="text-sm text-slate-400">No consent requests.</p>}
+          </div>
+        </div>
       </div>
 
       <div className="card overflow-hidden">

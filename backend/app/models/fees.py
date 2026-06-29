@@ -130,3 +130,50 @@ class FeeReminder(BaseEntity, Base):
     provider_reference: Mapped[str | None] = mapped_column(String(120), nullable=True)
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class FeeRefund(BaseEntity, Base):
+    __tablename__ = "fee_refund"
+    __table_args__ = (UniqueConstraint("tenant_id", "refund_no", name="uq_fee_refund_no"),)
+
+    refund_no: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    payment_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("payment.id"), index=True)
+    invoice_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("invoice.id"), index=True)
+    student_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("student.id"), index=True)
+    amount: Mapped[Numeric] = mapped_column(Numeric(12, 2), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    refund_status: Mapped[str] = mapped_column(String(24), default="requested", nullable=False)
+    approved_by: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reference: Mapped[str | None] = mapped_column(String(120), nullable=True)
+
+
+class PaymentReconciliation(BaseEntity, Base):
+    __tablename__ = "payment_reconciliation"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "provider", "provider_reference", name="uq_payment_reconciliation_ref"),
+    )
+
+    provider: Mapped[str] = mapped_column(String(40), nullable=False)
+    provider_reference: Mapped[str] = mapped_column(String(120), nullable=False)
+    payment_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("payment.id"), nullable=True)
+    expected_amount: Mapped[Numeric] = mapped_column(Numeric(12, 2), nullable=False)
+    settled_amount: Mapped[Numeric] = mapped_column(Numeric(12, 2), nullable=False)
+    settlement_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    reconciliation_status: Mapped[str] = mapped_column(String(24), default="unmatched", nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class CashierSession(BaseEntity, Base):
+    __tablename__ = "cashier_session"
+
+    cashier_id: Mapped[uuid.UUID] = mapped_column(GUID(), nullable=False, index=True)
+    business_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    opening_float: Mapped[Numeric] = mapped_column(Numeric(12, 2), default=0, nullable=False)
+    system_cash: Mapped[Numeric] = mapped_column(Numeric(12, 2), default=0, nullable=False)
+    counted_cash: Mapped[Numeric | None] = mapped_column(Numeric(12, 2), nullable=True)
+    variance: Mapped[Numeric | None] = mapped_column(Numeric(12, 2), nullable=True)
+    session_status: Mapped[str] = mapped_column(String(20), default="open", nullable=False)
+    close_notes: Mapped[str | None] = mapped_column(Text, nullable=True)

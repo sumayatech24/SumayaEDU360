@@ -17,7 +17,7 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -31,8 +31,11 @@ from app.models import (
     AcademicYear,
     AdmissionLead,
     Attendance,
+    Complaint,
+    ComplaintUpdate,
     CurriculumPlan,
     Employee,
+    PtmMeeting,
     EntityDef,
     Exam,
     ExamSubject,
@@ -1435,6 +1438,52 @@ async def _seed_demo(db: AsyncSession, tid: uuid.UUID) -> None:
         await _portal_user("principal@sumaya.edu",
                            f"{principal_emp.first_name} {principal_emp.last_name or ''}".strip(), "Principal@123",
                            roles["principal"], "employee", principal_emp.id)
+
+    # ---- Engagement demo: complaints + parent-teacher meetings ----
+    if first_student and teacher_emp:
+        tname = teacher_emp.first_name
+        complaints_demo = [
+            ("CR-00001", "transport", "Bus arriving late to the stop",
+             "The morning bus has been 15-20 minutes late for the past week.", "high", "assigned", False,
+             [("Rakesh Gupta", "parent", "Complaint raised. Auto-assigned to the class teacher.", None, "assigned", False)]),
+            ("CR-00002", "academic", "Request for extra help in Mathematics",
+             "Could the class teacher share practice worksheets for fractions?", "normal", "in_progress", False,
+             [("Rakesh Gupta", "parent", "Complaint raised. Auto-assigned to the class teacher.", None, "assigned", False),
+              (tname, "teacher", "Noted — I will share worksheets this week and set up a short revision slot.", "assigned", "in_progress", False)]),
+            ("CR-00003", "facilities", "Classroom fan not working",
+             "The ceiling fan in the section has stopped working.", "normal", "resolved", True,
+             [("Rakesh Gupta", "parent", "Complaint raised. Auto-assigned to the class teacher.", None, "assigned", False),
+              (tname, "teacher", "Maintenance team informed.", "assigned", "in_progress", True),
+              (tname, "teacher", "Fan repaired and tested. Closing the request.", "in_progress", "resolved", False)]),
+        ]
+        for ticket, cat, subj, desc, prio, status, resolved, trail in complaints_demo:
+            c, created = await get_or_create(
+                db, Complaint, tenant_id=tid, ticket_no=ticket,
+                defaults={"category": cat, "subject": subj, "description": desc, "priority": prio,
+                          "complaint_status": status, "raised_by_name": "Rakesh Gupta", "raised_by_role": "parent",
+                          "student_id": first_student.id, "assigned_to_id": teacher_emp.id,
+                          "assigned_role": "class_teacher",
+                          "resolved_at": datetime.now(timezone.utc) if resolved else None},
+            )
+            if created:
+                for author, role, note, sfrom, sto, internal in trail:
+                    db.add(ComplaintUpdate(tenant_id=tid, complaint_id=c.id, author_name=author,
+                                           author_role=role, note=note, status_from=sfrom, status_to=sto,
+                                           is_internal=internal))
+
+        meetings_demo = [
+            ("Term 1 progress discussion", date.today() + timedelta(days=5), "in_person", "scheduled", None, None),
+            ("Half-yearly result review", date.today() - timedelta(days=10), "in_person", "completed",
+             "Strong in reading; needs steady practice in number bonds. Agreed on 10 minutes daily practice.",
+             [{"text": "Share weekly practice sheet", "owner": "teacher", "done": False}]),
+        ]
+        for title, mdate, mode, status, tfeedback, actions in meetings_demo:
+            await get_or_create(
+                db, PtmMeeting, tenant_id=tid, title=title, student_id=first_student.id,
+                defaults={"teacher_id": teacher_emp.id, "meeting_date": mdate, "mode": mode,
+                          "meeting_status": status, "agenda": "Review attendance, homework and results.",
+                          "teacher_feedback": tfeedback, "action_items": actions},
+            )
 
 
 if __name__ == "__main__":

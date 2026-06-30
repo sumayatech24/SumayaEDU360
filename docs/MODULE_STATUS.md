@@ -26,7 +26,7 @@ four delivery states:
 
 | Priority | Module | Audited state | Main gaps / next delivery slice |
 |---|---|---|---|
-| Done first | Admissions CRM | **End-to-end** | Public applicant login/form/tracking; internal continuation application; per-document and eligibility verification; decision; class/section allocation; pre-enrollment fee/receipt; new enrollment or existing-student promotion; capacity guard. |
+| Done first | Admissions CRM | **End-to-end** | Public applicant login/form/tracking; both-parent/guardian occupation and annual-income capture; admin-configurable required document list reflected publicly; student/parent continuation and TC requests; per-document and eligibility verification; decision; class/section allocation; pre-enrollment fee/receipt; new enrollment or existing-student promotion; capacity guard. |
 | P1 | Academic Configuration | CRUD / thin screen | Admission windows, class capacity planning, terms/calendars, subject-class mapping rules, rollover controls. |
 | Done | Fees & Billing | **End-to-end core** | Academic-year component plans, bulk class/section assignment, aid/scholarship calculations, installment invoices, overdue status, partial collections, reminders, refund approval/processing, provider reconciliation, cashier open/close and parent ledger visibility. Future extension: live provider checkout/webhook adapters. |
 | Done | Student Information System | **End-to-end core** | Student 360, class invariants, document/medical/consent vault, parent consent action, transfer/withdrawal clearance and TC, re-enrollment, guarded alumni conversion, duplicate detection, academic/discipline/assets history and marks-gated promotion. Future extension: reviewed duplicate merge for complex operational histories. |
@@ -41,7 +41,7 @@ four delivery states:
 | Done | Hostel | **End-to-end core** | Class-first student allocation, gender/capacity safeguards, automatic bed inventory, transfer/vacate lifecycle, daily attendance, visitor check-in/out, incidents, occupancy dashboard, and student/parent portal visibility. Future extension: mess and hostel fee linkage. |
 | P2 | Finance / Store / Assets | Functional partial | Double-entry posting, budgets, approvals, GRN/vendor bills; purchase-to-stock; asset maintenance/depreciation/disposal. |
 | P3 | Parent / Student / Teacher portals | Functional partial | Notifications/inbox, requests and approvals, consent, appointments, richer self-service and mobile-responsive workflow coverage. |
-| P3 | Curriculum, Question Bank, Learning Repository | CRUD / thin screen | Curriculum mapping, coverage monitoring, blueprint/paper assembly, review/publish/versioning. |
+| P3 | Curriculum, Question Bank, Learning Repository | Functional partial | Teacher-scoped reusable questions, class/section practice publishing, student solving, objective auto-grading and teacher grading are implemented. Remaining: curriculum coverage, blueprint/paper assembly, review/versioning and repository publication controls. |
 | P3 | Meals, Activities, PTM, Communication, CMS, Knowledge | CRUD / thin screen or functional partial | Each needs planning, approvals, booking/capacity, payments where relevant, notifications, publication and exception handling. |
 | P3 | Dashboards & Analytics | Functional partial | KPI definitions, saved dashboards, drill-through, scheduled reports, data-quality monitoring. |
 | P3 | Security & Compliance | Functional partial | Approval policies, segregation of duties, session/device controls, retention/export, security events. |

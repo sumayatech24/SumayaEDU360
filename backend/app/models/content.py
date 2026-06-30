@@ -46,6 +46,38 @@ class QuestionBankItem(BaseEntity, Base):
     marks: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     question_text: Mapped[str] = mapped_column(Text, nullable=False)
     answer_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    options: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by_employee_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("employee.id"), nullable=True)
+
+
+class QuestionAssignment(BaseEntity, Base):
+    __tablename__ = "question_assignment"
+
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    teacher_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("employee.id"), index=True)
+    grade_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("grade.id"), index=True)
+    section_id: Mapped[uuid.UUID | None] = mapped_column(GUID(), ForeignKey("section.id"), nullable=True, index=True)
+    subject_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("subject.id"), index=True)
+    question_ids: Mapped[list] = mapped_column(JSON, nullable=False)
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    assignment_status: Mapped[str] = mapped_column(String(20), default="draft", nullable=False)
+    # draft / published / closed
+
+
+class QuestionAttempt(BaseEntity, Base):
+    __tablename__ = "question_attempt"
+
+    assignment_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("question_assignment.id"), index=True)
+    student_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("student.id"), index=True)
+    answers: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    max_score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    attempt_status: Mapped[str] = mapped_column(String(20), default="in_progress", nullable=False)
+    # in_progress / submitted / graded
+    submitted_at: Mapped[date | None] = mapped_column(Date, nullable=True)
+    teacher_feedback: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class PtmMeeting(BaseEntity, Base):

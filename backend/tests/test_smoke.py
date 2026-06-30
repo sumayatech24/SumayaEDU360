@@ -724,16 +724,21 @@ async def test_complete_new_admission_lifecycle(client):
             "student_name": "Admission Flow Child", "grade_applied_id": grade["id"],
             "academic_year_id": year["id"], "phone": "9999999901",
             "date_of_birth": "2017-05-10", "father_name": "Flow Test Parent",
+            "father_occupation": "Engineer", "father_annual_income": 1200000,
+            "mother_name": "Flow Test Mother", "mother_occupation": "Teacher",
+            "mother_annual_income": 800000,
             "declaration_accepted": True,
-            "documents": [
-                {"document_type": "birth_certificate", "file_name": "birth.pdf", "file_data": "data:test"},
-                {"document_type": "student_photo", "file_name": "photo.jpg", "file_data": "data:test"},
-            ],
+            "documents": [{"document_type": requirement["code"],
+                           "file_name": f"{requirement['code']}.pdf", "file_data": "data:test"}
+                          for requirement in config["document_requirements"]
+                          if requirement["is_required"] and requirement["application_type"] in ("all", "new")],
         },
     )
     assert submit.status_code == 201, submit.text
     application = submit.json()
     assert application["status"] == "submitted"
+    assert application["family"]["father"]["occupation"] == "Engineer"
+    assert float(application["family"]["father"]["annual_income"]) == 1200000
 
     admin = await _login(client, "admin@sumaya.edu", "Admin@123")
     for check in application["checks"]:
@@ -781,6 +786,22 @@ async def test_complete_new_admission_lifecycle(client):
     )
     assert enroll.status_code == 200, enroll.text
     assert enroll.json()["admission_no"].startswith("ADM")
+
+
+@pytest.mark.asyncio
+async def test_admission_document_requirements_are_admin_configurable(client):
+    admin = await _login(client, "admin@sumaya.edu", "Admin@123")
+    created = await client.post(
+        "/api/v1/admissions/document-requirements", headers=admin,
+        json={"code": "parent_income_proof", "label": "Parent income proof",
+              "description": "Latest salary slip or income certificate",
+              "application_type": "new", "is_required": False, "sort_order": 20},
+    )
+    assert created.status_code == 201, created.text
+    public = await client.get("/api/v1/public/admissions/SUMAYA/config")
+    assert public.status_code == 200, public.text
+    assert any(r["code"] == "parent_income_proof" and not r["is_required"]
+               for r in public.json()["document_requirements"])
 
 
 @pytest.mark.asyncio
@@ -835,6 +856,20 @@ async def test_continuing_student_applies_from_internal_portal(client):
     students = (await client.get("/api/v1/students", headers=admin, params={"page_size": 100})).json()["items"]
     promoted = next(s for s in students if s["id"] == enrolled.json()["student_id"])
     assert promoted["grade_id"] == target_grade["id"]
+
+
+@pytest.mark.asyncio
+async def test_portal_tc_request_enters_guarded_lifecycle(client):
+    student = await _login(client, "student@sumaya.edu", "Student@123")
+    created = await client.post(
+        "/api/v1/admissions/my-tc-requests", headers=student,
+        json={"effective_date": "2026-07-31", "reason": "Family relocation",
+              "destination_school": "New City School"},
+    )
+    assert created.status_code == 201, created.text
+    mine = await client.get("/api/v1/admissions/my-tc-requests", headers=student)
+    assert mine.status_code == 200, mine.text
+    assert any(r["id"] == created.json()["id"] and r["status"] == "submitted" for r in mine.json())
 
 
 @pytest.mark.asyncio
@@ -1105,3 +1140,50 @@ def test_income_tax_old_and_new_regime():
     net = float(slip["net_pay"])
     assert gross == 150000  # 18L / 12
     assert 0 < net < gross  # deductions + tax applied
+
+
+@pytest.mark.asyncio
+async def test_teacher_question_bank_assignment_and_student_attempt(client):
+    teacher = await _login(client, "teacher@sumaya.edu", "Teacher@123")
+    student = await _login(client, "student@sumaya.edu", "Student@123")
+    admin = await _login(client, "admin@sumaya.edu", "Admin@123")
+    options = await client.get("/api/v1/portal/teacher/marks-entry-options", headers=teacher)
+    assert options.status_code == 200, options.text
+    me = await client.get("/api/v1/portal/context", headers=student)
+    students = (await client.get("/api/v1/students", headers=admin, params={"page_size": 100})).json()["items"]
+    linked = next(s for s in students if s["id"] == me.json()["person_id"])
+    mapping = options.json()["assignments"][0]
+    if linked["grade_id"] != mapping["grade_id"] or linked["section_id"] != mapping["section_id"]:
+        aligned = await client.put(
+            f"/api/v1/students/{linked['id']}", headers=admin,
+            json={"grade_id": mapping["grade_id"], "section_id": mapping["section_id"]},
+        )
+        assert aligned.status_code == 200, aligned.text
+
+    question = await client.post(
+        "/api/v1/question-bank/questions", headers=teacher,
+        json={"grade_id": mapping["grade_id"], "subject_id": mapping["subject_id"],
+              "question_type": "mcq", "difficulty": "easy", "marks": 2,
+              "question_text": "What is 2 + 2?", "answer_text": "4",
+              "options": ["3", "4", "5"], "explanation": "Two pairs make four."},
+    )
+    assert question.status_code == 201, question.text
+    assignment = await client.post(
+        "/api/v1/question-bank/assignments", headers=teacher,
+        json={"title": "Quick practice", "grade_id": mapping["grade_id"],
+              "section_id": mapping["section_id"], "subject_id": mapping["subject_id"],
+              "question_ids": [question.json()["id"]], "due_date": "2026-12-31", "publish": True},
+    )
+    assert assignment.status_code == 201, assignment.text
+    available = await client.get("/api/v1/question-bank/student/assignments", headers=student)
+    assert available.status_code == 200, available.text
+    practice = next(a for a in available.json() if a["id"] == assignment.json()["id"])
+    assert "answer_text" not in practice["questions"][0]
+
+    submitted = await client.post(
+        f"/api/v1/question-bank/student/assignments/{assignment.json()['id']}/submit",
+        headers=student, json={"answers": {question.json()["id"]: "4"}},
+    )
+    assert submitted.status_code == 200, submitted.text
+    assert submitted.json()["status"] == "graded"
+    assert submitted.json()["score"] == 2

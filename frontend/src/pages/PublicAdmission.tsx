@@ -7,7 +7,10 @@ type Config = {
   institution_name: string;
   grades: { id: string; name: string }[];
   academic_years: { id: string; name: string; is_current: boolean }[];
-  required_documents: string[];
+  document_requirements: {
+    id: string; code: string; label: string; description?: string;
+    application_type: string; is_required: boolean; sort_order: number;
+  }[];
 };
 
 type Application = {
@@ -28,7 +31,9 @@ const blank = {
   student_name: "", grade_applied_id: "", academic_year_id: "", phone: "", email: "",
   date_of_birth: "", gender: "", category: "", religion: "", nationality: "Indian",
   address: "", city: "", state: "", pincode: "", father_name: "", father_phone: "",
-  mother_name: "", mother_phone: "", previous_school: "",
+  father_occupation: "", father_annual_income: "", mother_name: "", mother_phone: "",
+  mother_occupation: "", mother_annual_income: "", guardian_name: "", guardian_phone: "",
+  guardian_relation: "", guardian_occupation: "", guardian_annual_income: "", previous_school: "",
   fee_category: "regular", government_aid_percent: "0",
 };
 
@@ -96,6 +101,9 @@ export function PublicAdmission() {
           ...form, grade_applied_id: form.grade_applied_id,
           academic_year_id: form.academic_year_id || null,
           date_of_birth: form.date_of_birth || null, documents: docs,
+          father_annual_income: form.father_annual_income ? Number(form.father_annual_income) : null,
+          mother_annual_income: form.mother_annual_income ? Number(form.mother_annual_income) : null,
+          guardian_annual_income: form.guardian_annual_income ? Number(form.guardian_annual_income) : null,
           declaration_accepted: accepted,
         },
         { headers: { Authorization: `Bearer ${token}` } },
@@ -183,8 +191,17 @@ export function PublicAdmission() {
               <Field label="Mobile" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
               <Field label="Father name" value={form.father_name} onChange={(v) => setForm({ ...form, father_name: v })} />
               <Field label="Father mobile" value={form.father_phone} onChange={(v) => setForm({ ...form, father_phone: v })} />
+              <Field label="Father occupation" value={form.father_occupation} onChange={(v) => setForm({ ...form, father_occupation: v })} />
+              <Field label="Father annual income (₹)" type="number" value={form.father_annual_income} onChange={(v) => setForm({ ...form, father_annual_income: v })} />
               <Field label="Mother name" value={form.mother_name} onChange={(v) => setForm({ ...form, mother_name: v })} />
               <Field label="Mother mobile" value={form.mother_phone} onChange={(v) => setForm({ ...form, mother_phone: v })} />
+              <Field label="Mother occupation" value={form.mother_occupation} onChange={(v) => setForm({ ...form, mother_occupation: v })} />
+              <Field label="Mother annual income (₹)" type="number" value={form.mother_annual_income} onChange={(v) => setForm({ ...form, mother_annual_income: v })} />
+              <Field label="Other guardian name" value={form.guardian_name} onChange={(v) => setForm({ ...form, guardian_name: v })} />
+              <Field label="Guardian relation" value={form.guardian_relation} onChange={(v) => setForm({ ...form, guardian_relation: v })} />
+              <Field label="Guardian mobile" value={form.guardian_phone} onChange={(v) => setForm({ ...form, guardian_phone: v })} />
+              <Field label="Guardian occupation" value={form.guardian_occupation} onChange={(v) => setForm({ ...form, guardian_occupation: v })} />
+              <Field label="Guardian annual income (₹)" type="number" value={form.guardian_annual_income} onChange={(v) => setForm({ ...form, guardian_annual_income: v })} />
             </Section>
             <Section title="Address">
               <Field label="Address" value={form.address} onChange={(v) => setForm({ ...form, address: v })} />
@@ -195,17 +212,18 @@ export function PublicAdmission() {
             <div className="mb-5">
               <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Supporting documents</h3>
               <div className="grid gap-3 md:grid-cols-2">
-                {config.required_documents.map((type) => (
-                  <label key={type} className="rounded-lg border border-slate-200 p-3 text-sm">
-                    <span className="mb-2 block font-medium capitalize">{type.replace(/_/g, " ")}</span>
-                    <input type="file" accept="image/*,application/pdf" onChange={(e) => addFile(type, e.target.files?.[0])} />
-                    {docs.find((d) => d.document_type === type) && <span className="mt-1 block text-xs text-emerald-600">Attached ✓</span>}
+                {config.document_requirements.filter((r) => r.application_type === "all" || r.application_type === "new").map((requirement) => (
+                  <label key={requirement.id} className="rounded-lg border border-slate-200 p-3 text-sm">
+                    <span className="mb-1 block font-medium">{requirement.label}{requirement.is_required ? " *" : ""}</span>
+                    {requirement.description && <span className="mb-2 block text-xs text-slate-400">{requirement.description}</span>}
+                    <input type="file" accept="image/*,application/pdf" onChange={(e) => addFile(requirement.code, e.target.files?.[0])} />
+                    {docs.find((d) => d.document_type === requirement.code) && <span className="mt-1 block text-xs text-emerald-600">Attached ✓</span>}
                   </label>
                 ))}
               </div>
             </div>
             <label className="mb-5 flex gap-2 text-sm text-slate-600"><input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} /> I declare that the information supplied is correct and may be verified by the institution.</label>
-            <div className="flex justify-end gap-2"><button className="btn-ghost" onClick={() => setShowForm(false)}>Cancel</button><button className="btn-primary" disabled={busy || !accepted || !form.student_name || !form.grade_applied_id} onClick={submit}>{busy ? "Submitting…" : "Submit application"}</button></div>
+            <div className="flex justify-end gap-2"><button className="btn-ghost" onClick={() => setShowForm(false)}>Cancel</button><button className="btn-primary" disabled={busy || !accepted || !form.student_name || !form.grade_applied_id || config.document_requirements.some((r) => r.is_required && (r.application_type === "all" || r.application_type === "new") && !docs.some((d) => d.document_type === r.code))} onClick={submit}>{busy ? "Submitting…" : "Submit application"}</button></div>
           </div>
         )}
       </div>

@@ -21,12 +21,13 @@ from app.models.admissions import (
     AdmissionApplication,
     AdmissionCharge,
     AdmissionDocument,
+    AdmissionDocumentRequirement,
     AdmissionLead,
     AdmissionVerification,
 )
 from app.models.auth import User
 from app.models.people import Guardian, Student
-from app.models.student_records import StudentAcademicHistory
+from app.models.student_records import StudentAcademicHistory, StudentLifecycleRequest
 from app.models.tenant import Institution, Tenant
 
 router = APIRouter(tags=["Admissions"])
@@ -63,8 +64,17 @@ class PublicApplicationIn(BaseModel):
     pincode: str | None = None
     father_name: str | None = None
     father_phone: str | None = None
+    father_occupation: str | None = None
+    father_annual_income: Decimal | None = Field(default=None, ge=0)
     mother_name: str | None = None
     mother_phone: str | None = None
+    mother_occupation: str | None = None
+    mother_annual_income: Decimal | None = Field(default=None, ge=0)
+    guardian_name: str | None = None
+    guardian_phone: str | None = None
+    guardian_relation: str | None = None
+    guardian_occupation: str | None = None
+    guardian_annual_income: Decimal | None = Field(default=None, ge=0)
     previous_school: str | None = None
     fee_category: str = "regular"
     government_aid_percent: Decimal = Field(default=Decimal(0), ge=0, le=100)
@@ -78,6 +88,12 @@ class InternalApplicationIn(BaseModel):
     academic_year_id: uuid.UUID
     target_section_id: uuid.UUID | None = None
     notes: str | None = None
+
+
+class PortalTcRequestIn(BaseModel):
+    effective_date: date
+    reason: str = Field(min_length=3, max_length=2000)
+    destination_school: str | None = Field(default=None, max_length=255)
 
 
 class CheckDecisionIn(BaseModel):
@@ -106,6 +122,15 @@ class PlacementIn(BaseModel):
     academic_year_id: uuid.UUID
     grade_id: uuid.UUID
     section_id: uuid.UUID | None = None
+
+
+class DocumentRequirementIn(BaseModel):
+    code: str = Field(min_length=2, max_length=64, pattern=r"^[a-z0-9_]+$")
+    label: str = Field(min_length=2, max_length=150)
+    description: str | None = Field(default=None, max_length=500)
+    application_type: str = Field(default="all", pattern=r"^(all|new|continuing)$")
+    is_required: bool = True
+    sort_order: int = 0
 
 
 def _utcnow() -> datetime:
@@ -186,6 +211,17 @@ async def _application_view(db: AsyncSession, app: AdmissionApplication) -> dict
         "student_name": lead.student_name if lead else None,
         "phone": lead.phone if lead else None, "email": lead.email if lead else None,
         "date_of_birth": lead.date_of_birth if lead else None,
+        "family": {
+            "father": {"name": lead.father_name, "phone": lead.father_phone,
+                       "occupation": lead.father_occupation,
+                       "annual_income": str(lead.father_annual_income) if lead.father_annual_income is not None else None},
+            "mother": {"name": lead.mother_name, "phone": lead.mother_phone,
+                       "occupation": lead.mother_occupation,
+                       "annual_income": str(lead.mother_annual_income) if lead.mother_annual_income is not None else None},
+            "guardian": {"name": lead.guardian_name, "phone": lead.guardian_phone,
+                         "relation": lead.guardian_relation, "occupation": lead.guardian_occupation,
+                         "annual_income": str(lead.guardian_annual_income) if lead.guardian_annual_income is not None else None},
+        } if lead else None,
         "grade": grade.name if grade else None, "target_grade_id": str(app.target_grade_id) if app.target_grade_id else None,
         "academic_year": year.name if year else None,
         "academic_year_id": str(app.academic_year_id) if app.academic_year_id else None,
@@ -241,11 +277,35 @@ async def public_config(tenant_code: str, db: AsyncSession = Depends(get_db)):
     years = (await db.execute(select(AcademicYear).where(
         AcademicYear.tenant_id == tenant.id, AcademicYear.is_deleted.is_(False)
     ).order_by(AcademicYear.start_date.desc()))).scalars().all()
+    requirements = (await db.execute(select(AdmissionDocumentRequirement).where(
+        AdmissionDocumentRequirement.tenant_id == tenant.id,
+        AdmissionDocumentRequirement.is_deleted.is_(False),
+        AdmissionDocumentRequirement.status == "active",
+    ).order_by(AdmissionDocumentRequirement.sort_order, AdmissionDocumentRequirement.label))).scalars().all()
+    if not requirements:
+        defaults = [
+            ("birth_certificate", "Birth certificate"),
+            ("student_photo", "Student photo"),
+            ("address_proof", "Address proof"),
+            ("previous_school_record", "Previous school record"),
+        ]
+        for order, (code, label) in enumerate(defaults, 1):
+            row = AdmissionDocumentRequirement(
+                tenant_id=tenant.id, code=code, label=label, is_required=True, sort_order=order,
+            )
+            db.add(row)
+            requirements.append(row)
+        await db.flush()
     return {
         "tenant_code": tenant.code, "institution_name": institution.name if institution else tenant.name,
         "grades": [{"id": str(g.id), "name": g.name, "code": g.code} for g in grades],
         "academic_years": [{"id": str(y.id), "name": y.name, "is_current": y.is_current} for y in years],
-        "required_documents": ["birth_certificate", "student_photo", "address_proof", "previous_school_record"],
+        "document_requirements": [{
+            "id": str(r.id), "code": r.code, "label": r.label, "description": r.description,
+            "application_type": r.application_type, "is_required": r.is_required,
+            "sort_order": r.sort_order, "status": r.status,
+        } for r in requirements],
+        "required_documents": [r.code for r in requirements if r.is_required],
     }
 
 
@@ -257,6 +317,70 @@ async def internal_admission_config(
     if not tenant:
         raise HTTPException(404, "Tenant not found")
     return await public_config(tenant.code, db)
+
+
+@router.get("/admissions/document-requirements")
+async def list_document_requirements(
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_permission("admissions_crm:read")),
+):
+    rows = (await db.execute(select(AdmissionDocumentRequirement).where(
+        AdmissionDocumentRequirement.tenant_id == user.tenant_id,
+        AdmissionDocumentRequirement.is_deleted.is_(False),
+    ).order_by(AdmissionDocumentRequirement.sort_order, AdmissionDocumentRequirement.label))).scalars().all()
+    return [{"id": str(r.id), "code": r.code, "label": r.label, "description": r.description,
+             "application_type": r.application_type, "is_required": r.is_required,
+             "sort_order": r.sort_order, "status": r.status} for r in rows]
+
+
+@router.post("/admissions/document-requirements", status_code=201)
+async def create_document_requirement(
+    payload: DocumentRequirementIn,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_permission("admissions_crm:create")),
+):
+    exists = (await db.execute(select(AdmissionDocumentRequirement).where(
+        AdmissionDocumentRequirement.tenant_id == user.tenant_id,
+        AdmissionDocumentRequirement.code == payload.code,
+        AdmissionDocumentRequirement.is_deleted.is_(False),
+    ))).scalars().first()
+    if exists:
+        raise HTTPException(409, "A document requirement with this code already exists")
+    row = AdmissionDocumentRequirement(tenant_id=user.tenant_id, **payload.model_dump(),
+                                       created_by=user.id, updated_by=user.id)
+    db.add(row)
+    await db.flush()
+    await record_audit(db, action="create", entity="AdmissionDocumentRequirement",
+                       entity_id=row.id, actor=user)
+    return {"id": str(row.id), **payload.model_dump(), "status": row.status}
+
+
+@router.put("/admissions/document-requirements/{requirement_id}")
+async def update_document_requirement(
+    requirement_id: uuid.UUID, payload: DocumentRequirementIn,
+    db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_permission("admissions_crm:update")),
+):
+    row = await db.get(AdmissionDocumentRequirement, requirement_id)
+    if not row or row.tenant_id != user.tenant_id or row.is_deleted:
+        raise HTTPException(404, "Document requirement not found")
+    for key, value in payload.model_dump().items():
+        setattr(row, key, value)
+    row.updated_by = user.id
+    await record_audit(db, action="update", entity="AdmissionDocumentRequirement",
+                       entity_id=row.id, actor=user)
+    return {"id": str(row.id), **payload.model_dump(), "status": row.status}
+
+
+@router.delete("/admissions/document-requirements/{requirement_id}", status_code=204)
+async def delete_document_requirement(
+    requirement_id: uuid.UUID, db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(require_permission("admissions_crm:delete")),
+):
+    row = await db.get(AdmissionDocumentRequirement, requirement_id)
+    if not row or row.tenant_id != user.tenant_id or row.is_deleted:
+        raise HTTPException(404, "Document requirement not found")
+    row.is_deleted, row.status, row.updated_by = True, "inactive", user.id
 
 
 @router.post("/public/admissions/{tenant_code}/register")
@@ -322,15 +446,26 @@ async def submit_public_application(
     grade = await db.get(Grade, payload.grade_applied_id)
     if not grade or grade.tenant_id != applicant.tenant_id:
         raise HTTPException(404, "Selected class not found")
+    requirements = (await db.execute(select(AdmissionDocumentRequirement).where(
+        AdmissionDocumentRequirement.tenant_id == applicant.tenant_id,
+        AdmissionDocumentRequirement.status == "active",
+        AdmissionDocumentRequirement.is_required.is_(True),
+        AdmissionDocumentRequirement.application_type.in_(("all", "new")),
+        AdmissionDocumentRequirement.is_deleted.is_(False),
+    ))).scalars().all()
+    supplied = {doc.document_type for doc in payload.documents}
+    missing = [r.label for r in requirements if r.code not in supplied]
+    if missing:
+        raise HTTPException(422, f"Required documents missing: {', '.join(missing)}")
     number = await _new_number(db, applicant.tenant_id, "APP")
     lead = AdmissionLead(
         tenant_id=applicant.tenant_id, lead_no=number.replace("APP", "LEAD", 1),
-        student_name=payload.student_name, guardian_name=payload.father_name or payload.mother_name,
+        student_name=payload.student_name, guardian_name=payload.guardian_name,
         phone=payload.phone or applicant.phone, email=payload.email or applicant.email,
         grade_applied_id=grade.id, source="public_portal", stage="document_collection",
         **payload.model_dump(exclude={"student_name", "phone", "email", "grade_applied_id",
                                       "academic_year_id", "documents", "declaration_accepted",
-                                      "fee_category", "government_aid_percent"}),
+                                      "fee_category", "government_aid_percent", "guardian_name"}),
     )
     db.add(lead)
     await db.flush()
@@ -428,6 +563,67 @@ async def my_internal_applications(
         AdmissionApplication.is_deleted.is_(False),
     ).order_by(AdmissionApplication.created_at.desc()))).scalars().all()
     return [await _application_view(db, row) for row in rows]
+
+
+async def _portal_student(db: AsyncSession, user: CurrentUser) -> Student:
+    db_user = await db.get(User, user.id)
+    if not db_user or db_user.person_type != "student" or not db_user.person_id:
+        raise HTTPException(422, "A linked student account is required")
+    student = await db.get(Student, db_user.person_id)
+    if not student or student.tenant_id != user.tenant_id:
+        raise HTTPException(404, "Student not found")
+    return student
+
+
+@router.get("/admissions/my-tc-requests")
+async def my_tc_requests(
+    db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user),
+):
+    student = await _portal_student(db, user)
+    rows = (await db.execute(select(StudentLifecycleRequest).where(
+        StudentLifecycleRequest.tenant_id == user.tenant_id,
+        StudentLifecycleRequest.student_id == student.id,
+        StudentLifecycleRequest.request_type == "transfer",
+        StudentLifecycleRequest.is_deleted.is_(False),
+    ).order_by(StudentLifecycleRequest.created_at.desc()))).scalars().all()
+    return [{"id": str(r.id), "request_no": r.request_no, "status": r.request_status,
+             "effective_date": r.effective_date, "reason": r.reason,
+             "destination_school": r.destination_school,
+             "approval_remarks": r.approval_remarks, "certificate_no": r.certificate_no}
+            for r in rows]
+
+
+@router.post("/admissions/my-tc-requests", status_code=201)
+async def request_tc(
+    payload: PortalTcRequestIn, db: AsyncSession = Depends(get_db),
+    user: CurrentUser = Depends(get_current_user),
+):
+    student = await _portal_student(db, user)
+    duplicate = (await db.execute(select(StudentLifecycleRequest).where(
+        StudentLifecycleRequest.tenant_id == user.tenant_id,
+        StudentLifecycleRequest.student_id == student.id,
+        StudentLifecycleRequest.request_type == "transfer",
+        StudentLifecycleRequest.request_status.in_(("submitted", "approved")),
+        StudentLifecycleRequest.is_deleted.is_(False),
+    ))).scalars().first()
+    if duplicate:
+        raise HTTPException(409, f"Active TC request {duplicate.request_no} already exists")
+    count = (await db.execute(select(func.count()).select_from(StudentLifecycleRequest).where(
+        StudentLifecycleRequest.tenant_id == user.tenant_id,
+    ))).scalar_one()
+    row = StudentLifecycleRequest(
+        tenant_id=user.tenant_id, student_id=student.id,
+        request_no=f"TCREQ-{date.today().year}-{count + 1:05d}",
+        request_type="transfer", request_status="submitted",
+        effective_date=payload.effective_date, reason=payload.reason,
+        destination_school=payload.destination_school,
+        created_by=user.id, updated_by=user.id,
+    )
+    db.add(row)
+    await db.flush()
+    await record_audit(db, action="request_tc", entity="StudentLifecycleRequest",
+                       entity_id=row.id, actor=user)
+    return {"id": str(row.id), "request_no": row.request_no, "status": row.request_status}
 
 
 @router.get("/admissions/applications")
@@ -672,14 +868,17 @@ async def enroll_application(
         )
         db.add(student)
         await db.flush()
-        for relation, name, phone in (
-            ("father", lead.father_name, lead.father_phone),
-            ("mother", lead.mother_name, lead.mother_phone),
+        for relation, name, phone, occupation, annual_income in (
+            ("father", lead.father_name, lead.father_phone, lead.father_occupation, lead.father_annual_income),
+            ("mother", lead.mother_name, lead.mother_phone, lead.mother_occupation, lead.mother_annual_income),
+            (lead.guardian_relation or "guardian", lead.guardian_name, lead.guardian_phone,
+             lead.guardian_occupation, lead.guardian_annual_income),
         ):
             if name:
                 db.add(Guardian(
                     tenant_id=user.tenant_id, student_id=student.id, relation=relation,
-                    full_name=name, phone=phone, is_primary=relation == "father",
+                    full_name=name, phone=phone, occupation=occupation, annual_income=annual_income,
+                    is_primary=relation == "father" or (not lead.father_name and relation != "mother"),
                     created_by=user.id, updated_by=user.id,
                 ))
     lead.converted_student_id, lead.stage, lead.updated_by = student.id, "enrolled", user.id

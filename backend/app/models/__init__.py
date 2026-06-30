@@ -13,6 +13,7 @@ from app.models.admissions import (  # noqa: F401
     AdmissionApplication,
     AdmissionCharge,
     AdmissionDocument,
+    AdmissionDocumentRequirement,
     AdmissionLead,
     AdmissionVerification,
 )
@@ -70,6 +71,8 @@ from app.models.content import (  # noqa: F401
     KnowledgeArticle,
     LearningResource,
     PtmMeeting,
+    QuestionAssignment,
+    QuestionAttempt,
     QuestionBankItem,
 )
 from app.models.engagement import Complaint, ComplaintUpdate  # noqa: F401
@@ -143,7 +146,7 @@ from app.models.transport import (  # noqa: F401
 __all__ = [
     "AcademicYear", "Grade", "Program", "Section", "Semester", "Subject", "Topic",
     "AdmissionLead", "AdmissionApplicant", "AdmissionApplication", "AdmissionCharge",
-    "AdmissionDocument", "AdmissionVerification", "Attendance",
+    "AdmissionDocument", "AdmissionDocumentRequirement", "AdmissionVerification", "Attendance",
     "AIAssistantSession", "AIMessage", "AIInsight", "AIAutomationRun",
     "Permission", "Role", "RolePermission", "User", "UserRole",
     "Exam", "ExamSubject", "Marks", "MarksBatch", "QuestionPaper",
@@ -165,7 +168,7 @@ __all__ = [
     "LedgerAccount", "Vendor", "Expense", "PurchaseOrder",
     "InventoryItem", "StockMovement", "AssetAssignment", "Activity", "ActivityRegistration",
     "MealPlan", "MealMenu", "Announcement", "CmsPage", "Banner", "Facility", "FacilityBooking",
-    "LearningResource", "KnowledgeArticle", "QuestionBankItem", "PtmMeeting",
+    "LearningResource", "KnowledgeArticle", "QuestionAssignment", "QuestionAttempt", "QuestionBankItem", "PtmMeeting",
     "Complaint", "ComplaintUpdate",
     "StudentAcademicHistory", "Achievement", "DisciplinaryAction", "StudentRemark",
 ]

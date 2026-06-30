@@ -23,6 +23,7 @@ from app.api.v1 import (
     meta,
     portal,
     payroll,
+    question_bank,
     promotion,
     public_site,
     reporting,
@@ -56,6 +57,7 @@ api_router.include_router(attendance.router)
 api_router.include_router(exams.router)           # marks / report card
 api_router.include_router(promotion.router)
 api_router.include_router(payroll.router)         # salary structures, runs, approval, bank
+api_router.include_router(question_bank.router)   # teacher questions, assignments, student attempts
 api_router.include_router(student_lifecycle.router) # transfer, withdrawal, TC and re-enrollment
 api_router.include_router(workflows.router)       # lifecycle: admissions, library, hostel, hr
 api_router.include_router(workflows2.router)      # lifecycle: finance, inventory, homework, activities

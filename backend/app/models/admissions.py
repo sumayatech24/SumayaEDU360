@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, JSON, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -40,8 +40,17 @@ class AdmissionLead(BaseEntity, Base):
     pincode: Mapped[str | None] = mapped_column(String(20), nullable=True)
     father_name: Mapped[str | None] = mapped_column(String(150), nullable=True)
     father_phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    father_occupation: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    father_annual_income: Mapped[Numeric | None] = mapped_column(Numeric(14, 2), nullable=True)
     mother_name: Mapped[str | None] = mapped_column(String(150), nullable=True)
     mother_phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    mother_occupation: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    mother_annual_income: Mapped[Numeric | None] = mapped_column(Numeric(14, 2), nullable=True)
+    guardian_name: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    guardian_phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    guardian_relation: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    guardian_occupation: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    guardian_annual_income: Mapped[Numeric | None] = mapped_column(Numeric(14, 2), nullable=True)
     previous_school: Mapped[str | None] = mapped_column(String(200), nullable=True)
     # [{name, data}] — uploaded document data URIs (birth cert, TC, photo, ...)
     documents: Mapped[list | None] = mapped_column(JSON, nullable=True)
@@ -124,6 +133,22 @@ class AdmissionDocument(BaseEntity, Base):
     remarks: Mapped[str | None] = mapped_column(Text, nullable=True)
     verified_by: Mapped[uuid.UUID | None] = mapped_column(GUID(), nullable=True)
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AdmissionDocumentRequirement(BaseEntity, Base):
+    """Tenant-configured document requested on the applicable admission form."""
+
+    __tablename__ = "admission_document_requirement"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "code", name="uq_admission_document_requirement_code"),
+    )
+
+    code: Mapped[str] = mapped_column(String(64), nullable=False)
+    label: Mapped[str] = mapped_column(String(150), nullable=False)
+    description: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    application_type: Mapped[str] = mapped_column(String(24), default="all", nullable=False)
+    is_required: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
 
 class AdmissionVerification(BaseEntity, Base):

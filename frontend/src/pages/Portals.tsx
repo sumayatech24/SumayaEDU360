@@ -9,6 +9,7 @@ import { useBranding, type Branding } from "../lib/branding";
 import { printMarksheet } from "../lib/print";
 import { openReport, reportDocument } from "../lib/report";
 import { ContinuingAdmission } from "./ContinuingAdmission";
+import { StudentPractice, TeacherQuestionBank } from "./QuestionBank";
 
 const inr = (v?: string | number) => "₹" + Number(v ?? 0).toLocaleString("en-IN");
 
@@ -834,6 +835,7 @@ export function StudentPortal() {
         { label: "Homework", icon: "edit", to: "homework" },
         { label: "Timetable", icon: "table", to: "timetable" },
         { label: "Learning", icon: "book", to: "learning" },
+        { label: "Practice", icon: "check-square", to: "practice" },
         { label: "Activities", icon: "activity", to: "activities" },
         { label: "Facilities", icon: "grid", to: "facilities" },
         { label: "Help Desk", icon: "shield", to: "helpdesk" },
@@ -846,6 +848,7 @@ export function StudentPortal() {
         <Route path="homework" element={<HomeworkList />} />
         <Route path="timetable" element={<TimetableView />} />
         <Route path="learning" element={<LearningMaterialsView scope="student" />} />
+        <Route path="practice" element={<StudentPractice />} />
         <Route path="activities" element={<ActivitiesView />} />
         <Route path="facilities" element={<FacilitiesView />} />
         <Route path="helpdesk" element={<ComplaintsPanel canRaise />} />
@@ -865,21 +868,25 @@ export function ParentPortal() {
       nav={[
         { label: "My Child", icon: "users", to: "" },
         { label: "Homework", icon: "edit", to: "homework" },
+        { label: "Practice", icon: "check-square", to: "practice" },
         { label: "Timetable", icon: "table", to: "timetable" },
         { label: "Activities", icon: "activity", to: "activities" },
         { label: "Meetings", icon: "calendar", to: "meetings" },
         { label: "Help Desk", icon: "shield", to: "helpdesk" },
         { label: "Guardians", icon: "users", to: "guardians" },
+        { label: "Next Admission / TC", icon: "school", to: "admission" },
       ]}
     >
       <Routes>
         <Route index element={<Student360View childView />} />
         <Route path="homework" element={<HomeworkList readonly />} />
+        <Route path="practice" element={<StudentPractice />} />
         <Route path="timetable" element={<TimetableView />} />
         <Route path="activities" element={<ActivitiesView readonly />} />
         <Route path="meetings" element={<MeetingsPanel isFamily />} />
         <Route path="helpdesk" element={<ComplaintsPanel canRaise />} />
         <Route path="guardians" element={<GuardiansResults />} />
+        <Route path="admission" element={<ContinuingAdmission />} />
         <Route path="*" element={<Navigate to="" replace />} />
       </Routes>
     </PortalShell>
@@ -2045,6 +2052,7 @@ export function TeacherPortal() {
         { label: "Lesson Planning", icon: "book", to: "plans" },
         { label: "Plan Approvals", icon: "shield", to: "plan-reviews" },
         { label: "Student Marks", icon: "trending-up", to: "marks" },
+        { label: "Question Bank", icon: "check-square", to: "question-bank" },
         { label: "Assign Homework", icon: "edit", to: "homework" },
         { label: "Grade Homework", icon: "check-square", to: "submissions" },
         { label: "Resources", icon: "book", to: "resources" },
@@ -2063,6 +2071,7 @@ export function TeacherPortal() {
         <Route path="plans" element={<TeacherPlans />} />
         <Route path="plan-reviews" element={<TeacherPlanReviews />} />
         <Route path="marks" element={<TeacherMarks />} />
+        <Route path="question-bank" element={<TeacherQuestionBank />} />
         <Route path="homework" element={<TeacherHomework />} />
         <Route path="submissions" element={<TeacherSubmissions />} />
         <Route path="resources" element={<LearningMaterialsView scope="teacher" />} />

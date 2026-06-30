@@ -62,6 +62,7 @@ class Guardian(BaseEntity, Base):
     phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     occupation: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    annual_income: Mapped[Numeric | None] = mapped_column(Numeric(14, 2), nullable=True)
     address: Mapped[str | None] = mapped_column(Text, nullable=True)
     government_id_type: Mapped[str | None] = mapped_column(String(40), nullable=True)
     government_id_number: Mapped[str | None] = mapped_column(String(80), nullable=True)

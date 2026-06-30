@@ -12,7 +12,12 @@ type Application = {
   section?: string; status: string; verification_status: string; fee_status: string;
   submitted_at?: string; decision_notes?: string; converted_student_id?: string;
   target_grade_id?: string; academic_year_id?: string; target_section_id?: string;
+  family?: Record<string, { name?: string; phone?: string; relation?: string; occupation?: string; annual_income?: string }>;
   checks: Check[]; documents: Doc[]; charges: Charge[];
+};
+type DocumentRequirement = {
+  id: string; code: string; label: string; description?: string;
+  application_type: string; is_required: boolean; sort_order: number; status: string;
 };
 
 const COLUMNS = ["submitted", "under_review", "approved", "enrolled", "rejected"];
@@ -94,6 +99,7 @@ export function Admissions() {
       </div>
 
       {error && <div className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{error}</div>}
+      <DocumentRequirements />
 
       <div className="grid min-h-[560px] gap-4 lg:grid-cols-[360px_1fr]">
         <div className="card overflow-hidden">
@@ -125,6 +131,9 @@ export function Admissions() {
                 <Info label="Phone" value={selected.phone || "—"} />
                 <Info label="Email" value={selected.email || "—"} />
               </div>
+              {selected.family && <Panel title="Parents and guardian" subtitle="Occupation and declared annual income captured with the application.">
+                <div className="grid gap-3 md:grid-cols-3">{Object.entries(selected.family).filter(([, p]) => p.name).map(([relation, p]) => <div key={relation} className="rounded-lg bg-slate-50 p-3 text-sm"><div className="font-medium capitalize">{p.name} · {p.relation || relation}</div><div className="mt-1 text-xs text-slate-500">{p.occupation || "Occupation not supplied"} · {p.annual_income ? `₹${Number(p.annual_income).toLocaleString("en-IN")} annually` : "Income not supplied"}</div><div className="text-xs text-slate-400">{p.phone}</div></div>)}</div>
+              </Panel>}
 
               <Panel title="Class and section allocation" subtitle="Confirm the academic year, class, and available section before final enrollment.">
                 <div className="grid gap-3 md:grid-cols-3">
@@ -180,6 +189,42 @@ export function Admissions() {
       </div>
     </div>
   );
+}
+
+function DocumentRequirements() {
+  const qc = useQueryClient();
+  const [label, setLabel] = useState("");
+  const [applicationType, setApplicationType] = useState("all");
+  const [required, setRequired] = useState(true);
+  const { data = [] } = useQuery({
+    queryKey: ["admission-document-requirements"],
+    queryFn: async () => (await api.get<DocumentRequirement[]>("/admissions/document-requirements")).data,
+  });
+  const save = useMutation({
+    mutationFn: async () => api.post("/admissions/document-requirements", {
+      code: label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, ""),
+      label: label.trim(), application_type: applicationType, is_required: required,
+      sort_order: data.length + 1,
+    }),
+    onSuccess: async () => { setLabel(""); await qc.invalidateQueries({ queryKey: ["admission-document-requirements"] }); },
+  });
+  const remove = useMutation({
+    mutationFn: async (id: string) => api.delete(`/admissions/document-requirements/${id}`),
+    onSuccess: async () => qc.invalidateQueries({ queryKey: ["admission-document-requirements"] }),
+  });
+  return <div className="card p-5">
+    <div className="mb-4"><h2 className="font-semibold">Admission document requirements</h2><p className="text-xs text-slate-400">This list controls the upload fields and mandatory-document validation on the public form.</p></div>
+    <div className="mb-4 grid gap-3 md:grid-cols-[1fr_180px_130px_auto]">
+      <input className="input" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Document label, e.g. Aadhaar card" />
+      <select className="input" value={applicationType} onChange={(e) => setApplicationType(e.target.value)}><option value="all">All admissions</option><option value="new">New admission</option><option value="continuing">Continuing admission</option></select>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} /> Required</label>
+      <button className="btn-primary" disabled={!label.trim() || save.isPending} onClick={() => save.mutate()}>Add document</button>
+    </div>
+    <div className="flex flex-wrap gap-2">
+      {data.map((r) => <div key={r.id} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm"><span>{r.label}</span><span className="text-xs text-slate-400">{r.application_type}{r.is_required ? " · required" : " · optional"}</span><button className="text-xs text-red-500" onClick={() => remove.mutate(r.id)}>Remove</button></div>)}
+      {!data.length && <span className="text-sm text-slate-400">The default four requirements will appear when the public form is first opened.</span>}
+    </div>
+  </div>;
 }
 
 function Panel({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) { return <section className="rounded-xl border border-slate-200 p-4"><h3 className="font-semibold">{title}</h3><p className="mb-3 text-xs text-slate-400">{subtitle}</p>{children}</section>; }

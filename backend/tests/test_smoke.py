@@ -1026,3 +1026,82 @@ async def test_governed_ai_assistants_insights_and_agentic_approval(client):
     assert approved.status_code == 200, approved.text
     assert approved.json()["status"] == "approved"
     assert "disabled" in approved.json()["output"]["note"]
+
+
+@pytest.mark.asyncio
+async def test_payroll_run_approval_and_payslip(client):
+    admin = await _login(client, "admin@sumaya.edu", "Admin@123")
+    teacher = await _login(client, "teacher@sumaya.edu", "Teacher@123")
+
+    # Every seeded employee has a pay package (CTC + structure).
+    packages = await client.get("/api/v1/payroll/employees", headers=admin)
+    assert packages.status_code == 200, packages.text
+    with_ctc = [p for p in packages.json() if p["annual_ctc"]]
+    assert with_ctc, "expected seeded pay packages"
+
+    # Prepare the month's payroll for the whole institution in one batch.
+    run = await client.post("/api/v1/payroll/runs", headers=admin, json={"month": 6, "year": 2026})
+    assert run.status_code == 200, run.text
+    run_id = run.json()["id"]
+    assert run.json()["employee_count"] >= 1
+
+    # Draft payroll is private until the approval gate is crossed.
+    hidden = await client.get("/api/v1/portal/me/payslips", headers=teacher)
+    assert hidden.status_code == 200, hidden.text
+    assert not any(p["month"] == 6 and p["year"] == 2026 for p in hidden.json())
+
+    detail = await client.get(f"/api/v1/payroll/runs/{run_id}", headers=admin)
+    assert detail.status_code == 200, detail.text
+    payslips = detail.json()["payslips"]
+    assert payslips and detail.json()["editable"] is True
+    target = payslips[0]
+    base_net = float(target["net_pay"])
+    assert float(target["gross_earnings"]) > 0
+
+    # Extra-leave (LOP) + an ad-hoc deduction must reduce the net pay.
+    edit = await client.put(
+        f"/api/v1/payroll/payslips/{target['id']}",
+        headers=admin, json={"lop_days": 2, "adhoc_deduction": 1000, "adhoc_note": "Extra leave"},
+    )
+    assert edit.status_code == 200, edit.text
+    assert float(edit.json()["net_pay"]) < base_net
+
+    # Owner approval gate, then bank submission.
+    approve = await client.post(f"/api/v1/payroll/runs/{run_id}/approve", headers=admin, json={"note": "ok"})
+    assert approve.status_code == 200, approve.text
+    assert approve.json()["status"] == "approved"
+
+    visible = await client.get("/api/v1/portal/me/payslips", headers=teacher)
+    assert visible.status_code == 200, visible.text
+    june_slips = [p for p in visible.json() if p["month"] == 6 and p["year"] == 2026]
+    assert june_slips and float(june_slips[0]["net_pay"]) > 0
+
+    # Cannot re-approve an already-approved run.
+    again = await client.post(f"/api/v1/payroll/runs/{run_id}/approve", headers=admin, json={})
+    assert again.status_code == 409
+
+    process = await client.post(f"/api/v1/payroll/runs/{run_id}/process", headers=admin)
+    assert process.status_code == 200, process.text
+    assert process.json()["status"] == "paid"
+    assert process.json()["bank_reference"]
+
+    bank = await client.get(f"/api/v1/payroll/runs/{run_id}/bank-file", headers=admin)
+    assert bank.status_code == 200, bank.text
+    assert bank.json()["count"] >= 1
+
+
+def test_income_tax_old_and_new_regime():
+    from app.core.payroll import annual_income_tax, compute_payslip
+
+    # New-regime 87A rebate: <= 12L taxable pays no tax.
+    assert annual_income_tax(780000, "new") == 0
+    # Old regime taxes the same salary.
+    assert annual_income_tax(780000, "old") > 0
+    # A higher package is taxed under the new regime too.
+    assert annual_income_tax(1800000, "new") > 0
+
+    slip = compute_payslip(1800000, None, 40, "new")
+    gross = float(slip["gross_earnings"])
+    net = float(slip["net_pay"])
+    assert gross == 150000  # 18L / 12
+    assert 0 < net < gross  # deductions + tax applied

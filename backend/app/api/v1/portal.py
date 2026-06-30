@@ -24,6 +24,7 @@ from app.models.academics_ops import CurriculumPlan, Homework, HomeworkSubmissio
 from app.models.attendance import Attendance
 from app.models.auth import User
 from app.models.content import LearningResource, PtmMeeting
+from app.models.hr import PayrollRun, Payslip
 from app.models.engagement import Complaint
 from app.models.exams import Exam, ExamSubject, Marks, MarksBatch
 from app.models.operations import (
@@ -33,6 +34,9 @@ from app.models.people import Employee, Student, TeacherAssignment, TeacherProfi
 from app.models.student_records import StudentConsent
 
 router = APIRouter(prefix="/portal", tags=["Portals"])
+
+MONTHS_FULL = ["", "January", "February", "March", "April", "May", "June",
+               "July", "August", "September", "October", "November", "December"]
 
 
 class HomeworkSubmitIn(BaseModel):
@@ -2033,6 +2037,37 @@ async def teacher_marks(
 class CheckInIn(BaseModel):
     state: str = "present"  # present / late / on_duty / leave
     remarks: str | None = None
+
+
+@router.get("/me/payslips")
+async def my_payslips(
+    db: AsyncSession = Depends(get_db), user: CurrentUser = Depends(get_current_user)
+):
+    """The signed-in staff member's own payslips — only from approved/paid runs."""
+    tid = user.tenant_id
+    emp_id = await _linked_employee_id(db, user)
+    runs = {r.id: r for r in (await db.execute(select(PayrollRun).where(
+        PayrollRun.tenant_id == tid, PayrollRun.run_status.in_(("approved", "paid")),
+        PayrollRun.is_deleted.is_(False)))).scalars().all()}
+    if not runs:
+        return []
+    slips = (await db.execute(select(Payslip).where(
+        Payslip.tenant_id == tid, Payslip.employee_id == emp_id,
+        Payslip.payroll_run_id.in_(list(runs)), Payslip.is_deleted.is_(False),
+    ))).scalars().all()
+    out = []
+    for s in slips:
+        run = runs.get(s.payroll_run_id)
+        out.append({
+            "id": str(s.id), "month": run.month, "month_name": MONTHS_FULL[run.month], "year": run.year,
+            "financial_year": run.financial_year, "run_status": run.run_status,
+            "gross_earnings": str(s.gross_earnings), "statutory_deductions": str(s.statutory_deductions),
+            "tax_amount": str(s.tax_amount), "adhoc_deduction": str(s.adhoc_deduction),
+            "lop_days": str(s.lop_days), "net_pay": str(s.net_pay), "tax_regime": s.tax_regime,
+            "earnings": s.earnings or [], "deductions": s.deductions or [],
+        })
+    out.sort(key=lambda r: (r["year"], r["month"]), reverse=True)
+    return out
 
 
 @router.get("/me/attendance")

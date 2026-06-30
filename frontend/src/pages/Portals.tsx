@@ -1979,6 +1979,59 @@ function TeacherHomework() {
   );
 }
 
+// ---------------------------------------------------------------- Staff: my payslips
+interface MyPayslip {
+  id: string; month: number; month_name: string; year: number; financial_year: string; run_status: string;
+  gross_earnings: string; statutory_deductions: string; tax_amount: string; adhoc_deduction: string;
+  lop_days: string; net_pay: string; tax_regime: string;
+  earnings: { name: string; amount: string }[]; deductions: { name: string; amount: string }[];
+}
+
+export function MyPayslips() {
+  const brand = useBranding();
+  const { data, isLoading } = useQuery({
+    queryKey: ["my-payslips"],
+    queryFn: async () => (await api.get<MyPayslip[]>("/portal/me/payslips")).data,
+  });
+  function download(p: MyPayslip) {
+    const er = p.earnings.map((e) => `<tr><td>${e.name}</td><td style="text-align:right">${inr(e.amount)}</td></tr>`).join("");
+    const de = p.deductions.map((d) => `<tr><td>${d.name}</td><td style="text-align:right">${inr(d.amount)}</td></tr>`).join("");
+    openReport(reportDocument({
+      brand, title: `Payslip — ${p.month_name} ${p.year}`,
+      meta: `FY ${p.financial_year} · Tax regime: ${p.tax_regime}`,
+      bodyHtml: `<div style="display:flex;gap:24px"><div style="flex:1"><h3>Earnings</h3><table>${er}<tr style="font-weight:700"><td>Gross</td><td style="text-align:right">${inr(p.gross_earnings)}</td></tr></table></div>
+        <div style="flex:1"><h3>Deductions</h3><table>${de}</table></div></div>
+        <div style="margin-top:16px;font-size:16px;font-weight:700">Net Pay: ${inr(p.net_pay)}</div>`,
+      extraCss: "h3{font-size:13px;margin:8px 0 4px} td{padding:4px 8px;border:1px solid #e2e8f0}",
+    }));
+  }
+  return (
+    <div className="card overflow-hidden">
+      <div className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-600">My Payslips</div>
+      <table className="w-full text-sm">
+        <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+          <tr><th className="px-4 py-3">Period</th><th className="px-4 py-3">Gross</th><th className="px-4 py-3">Tax</th><th className="px-4 py-3">Deductions</th><th className="px-4 py-3">Net Pay</th><th className="px-4 py-3" /></tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {data?.map((p) => (
+            <tr key={p.id} className="hover:bg-slate-50">
+              <td className="px-4 py-2.5 font-medium">{p.month_name} {p.year}{p.run_status === "paid" ? <span className="ml-2 text-[10px] uppercase text-emerald-600">paid</span> : null}</td>
+              <td className="px-4 py-2.5">{inr(p.gross_earnings)}</td>
+              <td className="px-4 py-2.5">{inr(p.tax_amount)}</td>
+              <td className="px-4 py-2.5">{inr(Number(p.statutory_deductions) + Number(p.tax_amount) + Number(p.adhoc_deduction))}</td>
+              <td className="px-4 py-2.5 font-semibold">{inr(p.net_pay)}</td>
+              <td className="px-4 py-2.5 text-right"><button className="btn-ghost px-2.5 py-1 text-xs text-brand-600" onClick={() => download(p)}>Download</button></td>
+            </tr>
+          ))}
+          {!isLoading && (!data || data.length === 0) && (
+            <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-400">No payslips yet. They appear once payroll is approved.</td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function TeacherPortal() {
   return (
     <PortalShell
@@ -1988,6 +2041,7 @@ export function TeacherPortal() {
         { label: "Schedule", icon: "table", to: "schedule" },
         { label: "My Students", icon: "users", to: "students" },
         { label: "My Attendance", icon: "check-square", to: "my-attendance" },
+        { label: "My Payslips", icon: "credit-card", to: "payslips" },
         { label: "Lesson Planning", icon: "book", to: "plans" },
         { label: "Plan Approvals", icon: "shield", to: "plan-reviews" },
         { label: "Student Marks", icon: "trending-up", to: "marks" },
@@ -2005,6 +2059,7 @@ export function TeacherPortal() {
         <Route path="schedule" element={<TeacherSchedule />} />
         <Route path="students" element={<TeacherStudents />} />
         <Route path="my-attendance" element={<StaffSelfAttendance />} />
+        <Route path="payslips" element={<MyPayslips />} />
         <Route path="plans" element={<TeacherPlans />} />
         <Route path="plan-reviews" element={<TeacherPlanReviews />} />
         <Route path="marks" element={<TeacherMarks />} />

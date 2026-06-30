@@ -33,7 +33,7 @@ four delivery states:
 | P1 | Examination + Report Cards | Functional partial | Exam schemes, grading rules, moderation, absent/retest handling, consolidated report publishing, transcript history. |
 | P1 | Attendance | Functional partial | Timetable-backed sessions, leave/late/half-day rules, correction approval, parent alerts, monthly lock. |
 | P2 | Teacher Management | CRUD / thin screen | Recruitment/onboarding, qualifications and compliance, workload planning, substitute allocation, appraisal. |
-| P2 | Employee HRMS | Functional partial | Attendance/shift linkage, leave balances/policies, payroll components/statutory deductions, approval and payslip cycle. |
+| P2 | Employee HRMS | Functional partial | Employee master, leave requests, pay packages, salary structures, statutory deductions, monthly payroll approval/bank cycle, and staff payslip self-service are implemented. Remaining: shift-linked attendance and configurable leave balances/policies. |
 | P2 | Timetable & Scheduling | CRUD / thin screen | Conflict detection, room/resource constraints, substitution, publish/version workflow. |
 | P2 | Homework & Assignments | Functional partial | Rubrics, attachments, late/resubmission rules, class-wide grading workbench, notifications. |
 | Done | Library Management | **End-to-end core** | Catalog and copy inventory, issue/renew/return/lost handling, circulation and category performance, acquisition requests, vendor purchase orders, approval/order lifecycle, goods receipt and automatic stock/accession creation. Future extension: reservations and configurable member/fine policies. |
